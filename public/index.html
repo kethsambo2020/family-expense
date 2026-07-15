@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>សៀវភៅគ្រួសារ · Family Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  body { margin: 0; font-family: 'Kantumruy Pro', 'Noto Sans Khmer', sans-serif; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sheet-anim { animation: slideUp 0.28s cubic-bezier(0.22,1,0.36,1); }
+  .fade-anim { animation: fadeIn 0.2s ease-out; }
+  .spin-anim { animation: spin 0.8s linear infinite; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef } = React;
+
+/* =========================================================================
+   DATA LAYER: Cloudflare Pages Functions + D1 (see /functions/api/*.js)
+   All requests go to same-origin /api/... routes backed by a D1 database.
+   ========================================================================= */
+const API_BASE = "/api";
+
+const CATEGORIES = [
+  { id: "food", icon: "🍜", en: "Food", kh: "ម្ហូបអាហារ", color: "#B5443C" },
+  { id: "transport", icon: "🚌", en: "Transport", kh: "ធ្វើដំណើរ", color: "#8B5E34" },
+  { id: "utilities", icon: "⚡", en: "Utilities", kh: "ទឹក-អគ្គិសនី", color: "#C89B3C" },
+  { id: "rent", icon: "🏠", en: "Rent / Housing", kh: "ជួល-លំនៅដ្ឋាន", color: "#6B4E9B" },
+  { id: "health", icon: "⚕️", en: "Health", kh: "សុខភាព", color: "#C14B6B" },
+  { id: "education", icon: "🎓", en: "Education", kh: "អប់រំ", color: "#2E6B8A" },
+  { id: "salary", icon: "💵", en: "Salary", kh: "ប្រាក់ខែ", color: "#3F7D5C" },
+  { id: "business", icon: "💼", en: "Business", kh: "អាជីវកម្ម", color: "#2F6B4F" },
+  { id: "bank", icon: "🏦", en: "Bank / Loan", kh: "បង់ធនាគារ", color: "#4A5C8A" },
+  { id: "shopping", icon: "🛍️", en: "Market / Shopping", kh: "ដើរផ្សារ", color: "#B0793C" },
+  { id: "clothing", icon: "👕", en: "Clothing", kh: "សម្លៀកបំពាក់", color: "#7A5C99" },
+  { id: "children", icon: "🧒", en: "Children", kh: "ចំណាយសម្រាប់កូន", color: "#3C8A78" },
+  { id: "other", icon: "•••", en: "Other", kh: "ផ្សេងៗ", color: "#5B6B63" },
+];
+
+const MONTHS = [
+  { en: "January", kh: "មករា" }, { en: "February", kh: "កុម្ភៈ" },
+  { en: "March", kh: "មីនា" }, { en: "April", kh: "មេសា" },
+  { en: "May", kh: "ឧសភា" }, { en: "June", kh: "មិថុនា" },
+  { en: "July", kh: "កក្កដា" }, { en: "August", kh: "សីហា" },
+  { en: "September", kh: "កញ្ញា" }, { en: "October", kh: "តុលា" },
+  { en: "November", kh: "វិច្ឆិកា" }, { en: "December", kh: "ធ្នូ" },
+];
+
+const T = {
+  appTitle: { en: "Family Ledger", kh: "សៀវភៅគ្រួសារ" },
+  appSubtitle: { en: "Income & expense tracker", kh: "កំណត់ត្រាចំណូល-ចំណាយ" },
+  income: { en: "Income", kh: "ចំណូល" },
+  expense: { en: "Expense", kh: "ចំណាយ" },
+  balance: { en: "Balance", kh: "សមតុល្យ" },
+  addEntry: { en: "Add entry", kh: "បញ្ចូលធាតុ" },
+  editEntry: { en: "Edit entry", kh: "កែសម្រួលធាតុ" },
+  amount: { en: "Amount", kh: "ចំនួនទឹកប្រាក់" },
+  category: { en: "Category", kh: "ចំណាត់ថ្នាក់" },
+  date: { en: "Date", kh: "កាលបរិច្ឆេទ" },
+  note: { en: "Note (optional)", kh: "កំណត់ចំណាំ (មិនចាំបាច់)" },
+  member: { en: "Family member (optional)", kh: "សមាជិកគ្រួសារ (មិនចាំបាច់)" },
+  save: { en: "Save", kh: "រក្សាទុក" },
+  cancel: { en: "Cancel", kh: "បោះបង់" },
+  delete: { en: "Delete", kh: "លុប" },
+  all: { en: "All", kh: "ទាំងអស់" },
+  noEntries: { en: "No entries for this period yet.", kh: "មិនទាន់មានទិន្នន័យសម្រាប់រយៈពេលនេះទេ។" },
+  noEntriesSub: { en: "Tap the + button to add your first entry.", kh: "ចុចប៊ូតុង + ដើម្បីបញ្ចូលធាតុដំបូងរបស់អ្នក។" },
+  amountRequired: { en: "Enter a valid amount", kh: "សូមបញ្ចូលចំនួនទឹកប្រាក់ត្រឹមត្រូវ" },
+  setupAdminTitle: { en: "Create admin account", kh: "បង្កើតគណនី Admin" },
+  setupAdminSubtitle: { en: "Set up the administrator account to get started", kh: "បង្កើតគណនីអ្នកគ្រប់គ្រង ដើម្បីចាប់ផ្តើមប្រើប្រាស់" },
+  username: { en: "Username", kh: "ឈ្មោះអ្នកប្រើ" },
+  password: { en: "Password", kh: "ពាក្យសម្ងាត់" },
+  confirmPassword: { en: "Confirm password", kh: "បញ្ជាក់ពាក្យសម្ងាត់" },
+  displayName: { en: "Display name", kh: "ឈ្មោះសម្រាប់បង្ហាញ" },
+  createAdmin: { en: "Create admin account", kh: "បង្កើតគណនី Admin" },
+  loginTitle: { en: "Welcome back", kh: "សូមស្វាគមន៍មកវិញ" },
+  loginSubtitle: { en: "Log in to your family ledger", kh: "ចូលទៅកាន់សៀវភៅគ្រួសាររបស់អ្នក" },
+  login: { en: "Log in", kh: "ចូលប្រើ" },
+  invalidCredentials: { en: "Incorrect username or password", kh: "ឈ្មោះអ្នកប្រើ ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវ" },
+  logout: { en: "Log out", kh: "ចេញពីគណនី" },
+  loggedInAs: { en: "Logged in as", kh: "កំពុងប្រើដោយ" },
+  accounts: { en: "Accounts", kh: "គណនី" },
+  manageAccounts: { en: "Manage family accounts", kh: "គ្រប់គ្រងគណនីគ្រួសារ" },
+  addMember: { en: "Add family member", kh: "បន្ថែមសមាជិកគ្រួសារ" },
+  editAccount: { en: "Edit account", kh: "កែសម្រួលគណនី" },
+  addAccount: { en: "Add account", kh: "បន្ថែមគណនី" },
+  newPasswordOptional: { en: "New password (leave blank to keep current)", kh: "ពាក្យសម្ងាត់ថ្មី (ទុកចោលបើមិនប្តូរ)" },
+  roleAdmin: { en: "Admin", kh: "អ្នកគ្រប់គ្រង" },
+  roleMember: { en: "Member", kh: "សមាជិក" },
+  usernameTaken: { en: "This username is already taken", kh: "ឈ្មោះអ្នកប្រើនេះប្រើរួចហើយ" },
+  passwordMismatch: { en: "Passwords do not match", kh: "ពាក្យសម្ងាត់មិនត្រូវគ្នា" },
+  fieldsRequired: { en: "Please fill in all required fields", kh: "សូមបំពេញព័ត៌មានទាំងអស់ដែលត្រូវការ" },
+  noAccountsYet: { en: "No family accounts yet", kh: "មិនទាន់មានគណនីគ្រួសារនៅឡើយទេ" },
+  addCategory: { en: "Add category", kh: "បន្ថែមចំណាត់ថ្នាក់" },
+  categoryName: { en: "Category name", kh: "ឈ្មោះចំណាត់ថ្នាក់" },
+  navHome: { en: "Home", kh: "ទំព័រដើម" },
+  navRecord: { en: "Record", kh: "កត់ត្រា" },
+  navAccounts: { en: "Accounts", kh: "គណនី" },
+  filterMonth: { en: "Month", kh: "ខែ" },
+  filterYear: { en: "Year", kh: "ឆ្នាំ" },
+  totalIncome: { en: "Total income", kh: "ចំណូលសរុប" },
+  totalExpense: { en: "Total expense", kh: "ចំណាយសរុប" },
+  netBalance: { en: "Net balance", kh: "សមតុល្យសុទ្ធ" },
+  trendChart: { en: "Income vs Expense by month", kh: "និន្នាការចំណូល-ចំណាយតាមខែ" },
+  categoryChart: { en: "Expense by category", kh: "ចំណាយតាមចំណាត់ថ្នាក់" },
+  noChartData: { en: "Not enough data to show a chart yet", kh: "មិនទាន់មានទិន្នន័យគ្រប់គ្រាន់សម្រាប់បង្ហាញក្រាហ្វិកទេ" },
+  recentEntries: { en: "Recent entries", kh: "ធាតុថ្មីៗ" },
+  loading: { en: "Loading...", kh: "កំពុងផ្ទុក..." },
+  recordedBy: { en: "Recorded by", kh: "កត់ត្រាដោយ" },
+};
+
+const RIEL = "\u17DB";
+
+function fmt(amount, currency) {
+  if (currency === "USD") {
+    return "$" + Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  return Number(amount).toLocaleString("en-US", { maximumFractionDigits: 0 }) + " " + RIEL;
+}
+function todayISO() {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+}
+function loadLocal(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) { return fallback; }
+}
+function saveLocal(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+
+/* =========================================================================
+   API DATA HOOK  (fetch + polling against Cloudflare Pages Functions / D1)
+   Polls every few seconds so changes made by other family members show up
+   automatically without needing a manual refresh.
+   ========================================================================= */
+function useApiCollection(path, pollMs) {
+  const [data, setData] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  async function refetch() {
+    try {
+      const res = await fetch(API_BASE + path);
+      const json = await res.json();
+      setData(Array.isArray(json) ? json : []);
+    } catch (e) { console.error(path, e); }
+    setLoaded(true);
+  }
+  useEffect(() => {
+    refetch();
+    const interval = setInterval(refetch, pollMs || 5000);
+    return () => clearInterval(interval);
+  }, [path]);
+  return [data, loaded, refetch];
+}
+
+/* =========================================================================
+   APP ROOT
+   ========================================================================= */
+function App() {
+  const [lang, setLang] = useState(() => loadLocal("ledger-lang", "kh"));
+  const [sessionUserId, setSessionUserId] = useState(() => loadLocal("ledger-session", null));
+  const [page, setPage] = useState("home");
+
+  const [users, usersLoaded, refetchUsers] = useApiCollection("/users", 4000);
+  const [entries, entriesLoaded, refetchEntries] = useApiCollection("/entries", 4000);
+  const [customCategories, categoriesLoaded, refetchCategories] = useApiCollection("/categories", 15000);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingTx, setEditingTx] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [confirmDeleteUserId, setConfirmDeleteUserId] = useState(null);
+
+  const now = new Date();
+  const [filterMonth, setFilterMonth] = useState(now.getMonth());
+  const [filterYear, setFilterYear] = useState(now.getFullYear());
+  const [chartCurrency, setChartCurrency] = useState("KHR");
+
+  const t = (key) => (T[key] ? (T[key][lang] || T[key].en) : key);
+
+  useEffect(() => { saveLocal("ledger-lang", lang); }, [lang]);
+  useEffect(() => { saveLocal("ledger-session", sessionUserId); }, [sessionUserId]);
+
+  const allCategories = useMemo(() => [...CATEGORIES, ...customCategories], [customCategories]);
+  const currentUser = useMemo(() => users.find((u) => u.id === sessionUserId) || null, [users, sessionUserId]);
+
+  /* ---- Users / auth ---- */
+  async function handleCreateAdmin(data) {
+    const res = await fetch(API_BASE + "/users", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: data.username, password: data.password, name: data.name || data.username, role: "admin" }),
+    });
+    const created = await res.json();
+    await refetchUsers();
+    setSessionUserId(created.id);
+  }
+  function handleLogin(username, password) {
+    const found = users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password);
+    if (found) { setSessionUserId(found.id); return true; }
+    return false;
+  }
+  function handleLogout() { setSessionUserId(null); }
+  function openAddUser() { setEditingUser(null); setShowUserForm(true); }
+  function openEditUser(u) { setEditingUser(u); setShowUserForm(true); }
+  async function handleSaveUser(data) {
+    if (editingUser) {
+      const upd = { username: data.username, name: data.name || data.username };
+      if (data.password) upd.password = data.password;
+      await fetch(API_BASE + "/users/" + editingUser.id, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(upd),
+      });
+    } else {
+      await fetch(API_BASE + "/users", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: data.username, password: data.password, name: data.name || data.username, role: "member" }),
+      });
+    }
+    await refetchUsers();
+    setShowUserForm(false); setEditingUser(null);
+  }
+  async function handleDeleteUser(id) {
+    await fetch(API_BASE + "/users/" + id, { method: "DELETE" });
+    await refetchUsers();
+    setConfirmDeleteUserId(null);
+  }
+
+  /* ---- Categories ---- */
+  async function handleAddCategory(cat) {
+    await fetch(API_BASE + "/categories", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cat),
+    });
+    await refetchCategories();
+  }
+
+  /* ---- Entries ---- */
+  const years = useMemo(() => {
+    const set = new Set(entries.map((tx) => new Date(tx.date).getFullYear()));
+    set.add(now.getFullYear());
+    return Array.from(set).sort((a, b) => b - a);
+  }, [entries]);
+
+  const filtered = useMemo(() => {
+    return entries.filter((tx) => {
+      const d = new Date(tx.date);
+      const okYear = filterYear === "all" || d.getFullYear() === filterYear;
+      const okMonth = filterMonth === "all" || d.getMonth() === filterMonth;
+      return okYear && okMonth;
+    }).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.createdAt || 0) - (a.createdAt || 0)));
+  }, [entries, filterMonth, filterYear]);
+
+  const totals = useMemo(() => {
+    const t0 = { KHR: { income: 0, expense: 0 }, USD: { income: 0, expense: 0 } };
+    filtered.forEach((tx) => { t0[tx.currency][tx.type] += Number(tx.amount); });
+    return t0;
+  }, [filtered]);
+
+  const grouped = useMemo(() => {
+    const map = new Map();
+    filtered.forEach((tx) => {
+      if (!map.has(tx.date)) map.set(tx.date, []);
+      map.get(tx.date).push(tx);
+    });
+    return Array.from(map.entries());
+  }, [filtered]);
+
+  function openAdd() { setEditingTx(null); setShowForm(true); }
+  function openEdit(tx) { setEditingTx(tx); setShowForm(true); }
+  async function handleSave(data) {
+    if (editingTx) {
+      await fetch(API_BASE + "/entries/" + editingTx.id, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      });
+    } else {
+      await fetch(API_BASE + "/entries", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          createdByName: currentUser ? currentUser.name : "",
+          createdByUserId: currentUser ? currentUser.id : "",
+        }),
+      });
+    }
+    await refetchEntries();
+    setShowForm(false); setEditingTx(null);
+  }
+  async function handleDelete(id) {
+    await fetch(API_BASE + "/entries/" + id, { method: "DELETE" });
+    await refetchEntries();
+    setConfirmDeleteId(null);
+  }
+
+  if (!usersLoaded || !entriesLoaded || !categoriesLoaded) {
+    return <LoadingScreen t={t} />;
+  }
+  if (users.length === 0) {
+    return <SetupAdmin lang={lang} t={t} setLang={setLang} onCreate={handleCreateAdmin} />;
+  }
+  if (!currentUser) {
+    return <LoginScreen lang={lang} t={t} setLang={setLang} onLogin={handleLogin} />;
+  }
+
+  return (
+    <div className="min-h-screen w-full flex" style={{ background: "#EFEAE0" }}>
+      <Sidebar lang={lang} t={t} page={page} setPage={setPage} currentUser={currentUser} />
+      <div className="flex-1 min-h-screen flex flex-col ml-16 md:ml-56">
+        <TopBar lang={lang} setLang={setLang} t={t} page={page} currentUser={currentUser} onLogout={handleLogout} />
+        <div className="flex-1 px-4 md:px-8 py-5 max-w-5xl w-full mx-auto">
+          {page === "home" && (
+            <HomePage
+              t={t} lang={lang} entries={entries} filtered={filtered} totals={totals}
+              filterMonth={filterMonth} setFilterMonth={setFilterMonth}
+              filterYear={filterYear} setFilterYear={setFilterYear} years={years}
+              chartCurrency={chartCurrency} setChartCurrency={setChartCurrency}
+              allCategories={allCategories}
+            />
+          )}
+          {page === "record" && (
+            <RecordPage
+              t={t} lang={lang} grouped={grouped} allCategories={allCategories}
+              filterMonth={filterMonth} setFilterMonth={setFilterMonth}
+              filterYear={filterYear} setFilterYear={setFilterYear} years={years}
+              onAdd={openAdd} onEdit={openEdit} onDeleteRequest={setConfirmDeleteId}
+            />
+          )}
+          {page === "accounts" && currentUser.role === "admin" && (
+            <AccountsPage
+              lang={lang} t={t} users={users}
+              onAdd={openAddUser} onEdit={openEditUser} onDeleteRequest={setConfirmDeleteUserId}
+            />
+          )}
+        </div>
+        {page === "record" && (
+          <button onClick={openAdd}
+            className="fixed bottom-6 right-6 w-14 h-14 rounded-full text-white text-2xl flex items-center justify-center shadow-xl active:scale-95 transition z-30"
+            style={{ background: "#1B4B43" }}>+</button>
+        )}
+      </div>
+
+      {showForm && (
+        <EntryForm lang={lang} t={t} initial={editingTx} allCategories={allCategories}
+          currentUser={currentUser} onAddCategory={handleAddCategory}
+          onSave={handleSave} onClose={() => { setShowForm(false); setEditingTx(null); }}
+          onDelete={editingTx ? () => setConfirmDeleteId(editingTx.id) : null} />
+      )}
+      {confirmDeleteId && (
+        <ConfirmDialog t={t} message={lang === "kh" ? "តើអ្នកប្រាកដថាចង់លុបធាតុនេះមែនទេ?" : "Delete this entry?"}
+          onConfirm={() => handleDelete(confirmDeleteId)} onCancel={() => setConfirmDeleteId(null)} />
+      )}
+      {showUserForm && (
+        <UserForm lang={lang} t={t} initial={editingUser} existingUsers={users}
+          onSave={handleSaveUser} onClose={() => { setShowUserForm(false); setEditingUser(null); }} />
+      )}
+      {confirmDeleteUserId && (
+        <ConfirmDialog t={t} message={lang === "kh" ? "តើអ្នកប្រាកដថាចង់លុបគណនីនេះមែនទេ?" : "Delete this account?"}
+          onConfirm={() => handleDeleteUser(confirmDeleteUserId)} onCancel={() => setConfirmDeleteUserId(null)} />
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   LOADING / SETUP NOTICE
+   ========================================================================= */
+function LoadingScreen({ t }) {
+  return (
+    <div className="min-h-screen w-full flex flex-col items-center justify-center gap-3" style={{ background: "#EFEAE0" }}>
+      <div className="w-10 h-10 rounded-full border-4 spin-anim" style={{ borderColor: "#C89B3C transparent #C89B3C transparent" }} />
+      <p className="text-sm" style={{ color: "#5B5344" }}>{t("loading")}</p>
+    </div>
+  );
+}
+
+/* =========================================================================
+   SIDEBAR
+   ========================================================================= */
+function Sidebar({ lang, t, page, setPage, currentUser }) {
+  const items = [
+    { id: "home", icon: "🏠", label: t("navHome") },
+    { id: "record", icon: "🧾", label: t("navRecord") },
+  ];
+  if (currentUser.role === "admin") items.push({ id: "accounts", icon: "👥", label: t("navAccounts") });
+
+  return (
+    <div className="fixed left-0 top-0 h-screen w-16 md:w-56 flex flex-col z-20" style={{ background: "#1B4B43" }}>
+      <div className="h-16 flex items-center justify-center md:justify-start md:px-5 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <span className="text-2xl">💰</span>
+        <span className="hidden md:inline ml-2 text-white font-semibold text-sm tracking-wide">{t("appTitle")}</span>
+      </div>
+      <nav className="flex-1 py-4 flex flex-col gap-1 px-2 md:px-3">
+        {items.map((it) => {
+          const active = page === it.id;
+          return (
+            <button key={it.id} onClick={() => setPage(it.id)}
+              className="flex items-center gap-3 px-3 py-3 rounded-xl transition justify-center md:justify-start"
+              style={{ background: active ? "rgba(200,155,60,0.18)" : "transparent", color: active ? "#F4EFE2" : "#CFE0DA" }}>
+              <span className="text-xl flex-shrink-0">{it.icon}</span>
+              <span className="hidden md:inline text-sm font-medium">{it.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+function TopBar({ lang, setLang, t, page, currentUser, onLogout }) {
+  const titleKey = page === "home" ? "navHome" : page === "record" ? "navRecord" : "navAccounts";
+  return (
+    <header className="sticky top-0 z-10 px-4 md:px-8 py-4 flex items-center justify-between" style={{ background: "#FAF7F0", borderBottom: "1px solid #E8E0CE" }}>
+      <div>
+        <h1 className="text-base md:text-lg font-semibold" style={{ color: "#1F2A24" }}>{t(titleKey)}</h1>
+        <div className="text-[11px] mt-0.5" style={{ color: "#9C9280" }}>
+          {t("loggedInAs")}: <span className="font-medium" style={{ color: "#5B5344" }}>{currentUser.name}</span>
+          <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold" style={{ background: "#EFEAE0", color: "#8A7C56" }}>
+            {currentUser.role === "admin" ? t("roleAdmin") : t("roleMember")}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={() => setLang((l) => (l === "kh" ? "en" : "kh"))}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium active:scale-95 transition"
+          style={{ background: "#EFEAE0", color: "#5B5344" }}>🌐 {lang === "kh" ? "EN" : "ខ្មែរ"}</button>
+        <button onClick={onLogout}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium active:scale-95 transition"
+          style={{ background: "#FBEAE8", color: "#B5443C" }}>⎋ {t("logout")}</button>
+      </div>
+    </header>
+  );
+}
+
+/* =========================================================================
+   HOME / DASHBOARD PAGE
+   ========================================================================= */
+function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMonth, filterYear, setFilterYear, years, chartCurrency, setChartCurrency, allCategories }) {
+  const barRef = useRef(null);
+  const pieRef = useRef(null);
+  const barChart = useRef(null);
+  const pieChart = useRef(null);
+
+  const barData = useMemo(() => {
+    const year = filterYear === "all" ? new Date().getFullYear() : filterYear;
+    const income = new Array(12).fill(0);
+    const expense = new Array(12).fill(0);
+    entries.forEach((tx) => {
+      if (tx.currency !== chartCurrency) return;
+      const d = new Date(tx.date);
+      if (d.getFullYear() !== year) return;
+      if (tx.type === "income") income[d.getMonth()] += Number(tx.amount);
+      else expense[d.getMonth()] += Number(tx.amount);
+    });
+    return { year, income, expense };
+  }, [entries, filterYear, chartCurrency]);
+
+  const pieData = useMemo(() => {
+    const map = new Map();
+    filtered.forEach((tx) => {
+      if (tx.currency !== chartCurrency || tx.type !== "expense") return;
+      map.set(tx.category, (map.get(tx.category) || 0) + Number(tx.amount));
+    });
+    return Array.from(map.entries()).map(([catId, val]) => {
+      const cat = allCategories.find((c) => c.id === catId);
+      return { catId, val, label: cat ? (lang === "kh" ? cat.kh : cat.en) : catId, color: cat ? cat.color : "#999", icon: cat ? cat.icon : "•" };
+    }).sort((a, b) => b.val - a.val);
+  }, [filtered, chartCurrency, allCategories, lang]);
+
+  useEffect(() => {
+    if (!barRef.current) return;
+    if (barChart.current) barChart.current.destroy();
+    barChart.current = new Chart(barRef.current, {
+      type: "bar",
+      data: {
+        labels: MONTHS.map((m) => (lang === "kh" ? m.kh : m.en).slice(0, 3)),
+        datasets: [
+          { label: t("income"), data: barData.income, backgroundColor: "#3F7D5C", borderRadius: 4 },
+          { label: t("expense"), data: barData.expense, backgroundColor: "#B5443C", borderRadius: 4 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { color: "#5B5344", font: { size: 11 } } } },
+        scales: {
+          x: { ticks: { color: "#9C9280", font: { size: 10 } }, grid: { display: false } },
+          y: { ticks: { color: "#9C9280", font: { size: 10 } }, grid: { color: "#EFEAE0" } },
+        },
+      },
+    });
+    return () => { if (barChart.current) barChart.current.destroy(); };
+  }, [barData, lang]);
+
+  useEffect(() => {
+    if (!pieRef.current) return;
+    if (pieChart.current) pieChart.current.destroy();
+    if (pieData.length === 0) return;
+    pieChart.current = new Chart(pieRef.current, {
+      type: "pie",
+      data: {
+        labels: pieData.map((p) => p.icon + " " + p.label),
+        datasets: [{ data: pieData.map((p) => p.val), backgroundColor: pieData.map((p) => p.color), borderWidth: 2, borderColor: "#FAF7F0" }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { color: "#5B5344", font: { size: 10 }, boxWidth: 12, padding: 8 } } },
+      },
+    });
+    return () => { if (pieChart.current) pieChart.current.destroy(); };
+  }, [pieData]);
+
+  return (
+    <div className="space-y-5">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value === "all" ? "all" : Number(e.target.value))}
+          className="px-3 py-2 rounded-xl text-xs font-medium outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }}>
+          <option value="all">{t("all")} · {t("filterMonth")}</option>
+          {MONTHS.map((m, i) => <option key={i} value={i}>{lang === "kh" ? m.kh : m.en}</option>)}
+        </select>
+        <select value={filterYear} onChange={(e) => setFilterYear(e.target.value === "all" ? "all" : Number(e.target.value))}
+          className="px-3 py-2 rounded-xl text-xs font-medium outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }}>
+          <option value="all">{t("all")} · {t("filterYear")}</option>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <div className="ml-auto flex rounded-xl overflow-hidden" style={{ border: "1px solid #E8E0CE" }}>
+          {["KHR", "USD"].map((c) => (
+            <button key={c} onClick={() => setChartCurrency(c)}
+              className="px-3 py-2 text-xs font-semibold"
+              style={{ background: chartCurrency === c ? "#1B4B43" : "#FFFFFF", color: chartCurrency === c ? "#fff" : "#5B5344" }}>{c}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <SummaryCard label={t("totalIncome")} value={fmt(totals[chartCurrency].income, chartCurrency)} color="#3F7D5C" icon="⬆️" />
+        <SummaryCard label={t("totalExpense")} value={fmt(totals[chartCurrency].expense, chartCurrency)} color="#B5443C" icon="⬇️" />
+        <SummaryCard label={t("netBalance")} value={fmt(totals[chartCurrency].income - totals[chartCurrency].expense, chartCurrency)} color="#1B4B43" icon="⚖️" />
+      </div>
+
+      {/* Charts */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
+          <h3 className="text-xs font-semibold mb-3" style={{ color: "#5B5344" }}>📈 {t("trendChart")} ({barData.year})</h3>
+          <div style={{ height: 220 }}><canvas ref={barRef}></canvas></div>
+        </div>
+        <div className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
+          <h3 className="text-xs font-semibold mb-3" style={{ color: "#5B5344" }}>🥧 {t("categoryChart")}</h3>
+          {pieData.length === 0 ? (
+            <div className="h-[220px] flex items-center justify-center text-xs text-center px-4" style={{ color: "#9C9280" }}>{t("noChartData")}</div>
+          ) : (
+            <div style={{ height: 220 }}><canvas ref={pieRef}></canvas></div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent entries */}
+      <div className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
+        <h3 className="text-xs font-semibold mb-3" style={{ color: "#5B5344" }}>🕘 {t("recentEntries")}</h3>
+        {filtered.length === 0 ? (
+          <p className="text-xs text-center py-6" style={{ color: "#9C9280" }}>{t("noEntries")}</p>
+        ) : (
+          <div className="space-y-1">
+            {filtered.slice(0, 6).map((tx) => {
+              const cat = allCategories.find((c) => c.id === tx.category);
+              return (
+                <div key={tx.id} className="flex items-center gap-3 py-2" style={{ borderTop: "1px solid #F3EEDE" }}>
+                  <span className="text-lg flex-shrink-0">{cat ? cat.icon : "•"}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium truncate" style={{ color: "#1F2A24" }}>{cat ? (lang === "kh" ? cat.kh : cat.en) : tx.category}</div>
+                    <div className="text-[10px]" style={{ color: "#9C9280" }}>{tx.date}</div>
+                  </div>
+                  <div className="text-xs font-semibold mono flex-shrink-0" style={{ color: tx.type === "income" ? "#3F7D5C" : "#B5443C" }}>
+                    {tx.type === "income" ? "+" : "-"}{fmt(tx.amount, tx.currency)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value, color, icon }) {
+  return (
+    <div className="rounded-2xl p-3 md:p-4" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
+      <div className="text-lg mb-1">{icon}</div>
+      <div className="text-[10px] md:text-xs mb-1" style={{ color: "#9C9280" }}>{label}</div>
+      <div className="text-xs md:text-sm font-bold mono truncate" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   RECORD PAGE  (list + add/edit like the original app)
+   ========================================================================= */
+function RecordPage({ t, lang, grouped, allCategories, filterMonth, setFilterMonth, filterYear, setFilterYear, years, onAdd, onEdit, onDeleteRequest }) {
+  return (
+    <div className="space-y-4 pb-20">
+      <div className="flex flex-wrap gap-2 items-center">
+        <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value === "all" ? "all" : Number(e.target.value))}
+          className="px-3 py-2 rounded-xl text-xs font-medium outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }}>
+          <option value="all">{t("all")} · {t("filterMonth")}</option>
+          {MONTHS.map((m, i) => <option key={i} value={i}>{lang === "kh" ? m.kh : m.en}</option>)}
+        </select>
+        <select value={filterYear} onChange={(e) => setFilterYear(e.target.value === "all" ? "all" : Number(e.target.value))}
+          className="px-3 py-2 rounded-xl text-xs font-medium outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }}>
+          <option value="all">{t("all")} · {t("filterYear")}</option>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <button onClick={onAdd} className="ml-auto px-4 py-2 rounded-xl text-xs font-semibold text-white active:scale-95 transition" style={{ background: "#1B4B43" }}>
+          + {t("addEntry")}
+        </button>
+      </div>
+
+      {grouped.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="text-3xl mb-2">🧾</div>
+          <p className="text-sm font-medium" style={{ color: "#5B5344" }}>{t("noEntries")}</p>
+          <p className="text-xs mt-1" style={{ color: "#9C9280" }}>{t("noEntriesSub")}</p>
+        </div>
+      ) : (
+        grouped.map(([date, txs]) => (
+          <div key={date}>
+            <div className="text-[11px] font-semibold mb-1.5 mono" style={{ color: "#9C9280" }}>{date}</div>
+            <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
+              {txs.map((tx, idx) => {
+                const cat = allCategories.find((c) => c.id === tx.category);
+                return (
+                  <button key={tx.id} onClick={() => onEdit(tx)} className="w-full flex items-center gap-3 px-3 py-3 text-left active:bg-[#FAF7F0] transition"
+                    style={{ borderTop: idx === 0 ? "none" : "1px solid #F3EEDE" }}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-base" style={{ background: (cat ? cat.color : "#999") + "1A" }}>
+                      {cat ? cat.icon : "•"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate" style={{ color: "#1F2A24" }}>{cat ? (lang === "kh" ? cat.kh : cat.en) : tx.category}</div>
+                      <div className="text-[10px] truncate" style={{ color: "#9C9280" }}>
+                        {tx.member ? tx.member + " · " : ""}{tx.createdByName || ""}{tx.note ? " · " + tx.note : ""}
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold mono flex-shrink-0" style={{ color: tx.type === "income" ? "#3F7D5C" : "#B5443C" }}>
+                      {tx.type === "income" ? "+" : "-"}{fmt(tx.amount, tx.currency)}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   ACCOUNTS PAGE
+   ========================================================================= */
+function AccountsPage({ lang, t, users, onAdd, onEdit, onDeleteRequest }) {
+  return (
+    <div className="space-y-4">
+      <button onClick={onAdd} className="px-4 py-2 rounded-xl text-xs font-semibold text-white active:scale-95 transition" style={{ background: "#1B4B43" }}>
+        + {t("addMember")}
+      </button>
+      {users.length === 0 ? (
+        <p className="text-sm text-center py-8" style={{ color: "#9C9280" }}>{t("noAccountsYet")}</p>
+      ) : (
+        <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
+          {users.map((u, idx) => (
+            <div key={u.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: idx === 0 ? "none" : "1px solid #F3EEDE" }}>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-base" style={{ background: (u.role === "admin" ? "#C89B3C" : "#1B4B43") + "1A" }}>
+                {u.role === "admin" ? "👑" : "🙂"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate" style={{ color: "#1F2A24" }}>{u.name}</div>
+                <div className="text-xs truncate mono" style={{ color: "#9C9280" }}>@{u.username} · {u.role === "admin" ? t("roleAdmin") : t("roleMember")}</div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button onClick={() => onEdit(u)} className="w-8 h-8 rounded-full flex items-center justify-center text-sm" style={{ background: "#EFEAE0" }}>✎</button>
+                {u.role !== "admin" && (
+                  <button onClick={() => onDeleteRequest(u.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-sm" style={{ background: "#FBEAE8" }}>🗑</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   ENTRY FORM (sheet)
+   ========================================================================= */
+function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory, onSave, onClose, onDelete }) {
+  const [type, setType] = useState(initial?.type || "expense");
+  const [amount, setAmount] = useState(initial?.amount ? String(initial.amount) : "");
+  const [currency, setCurrency] = useState(initial?.currency || "KHR");
+  const [category, setCategory] = useState(initial?.category || allCategories[0].id);
+  const [date, setDate] = useState(initial?.date || todayISO());
+  const [member, setMember] = useState(initial?.member || "");
+  const [note, setNote] = useState(initial?.note || "");
+  const [error, setError] = useState("");
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCatIcon, setNewCatIcon] = useState("");
+  const [newCatName, setNewCatName] = useState("");
+
+  function saveNewCategory() {
+    if (!newCatName.trim()) return;
+    const id = "custom_" + Date.now().toString(36);
+    onAddCategory({ id, icon: newCatIcon || "🏷️", en: newCatName.trim(), kh: newCatName.trim(), color: "#7A6A4A" });
+    setCategory(id);
+    setShowAddCategory(false); setNewCatIcon(""); setNewCatName("");
+  }
+
+  function submit() {
+    const num = Number(amount);
+    if (!amount || isNaN(num) || num <= 0) { setError(t("amountRequired")); return; }
+    onSave({ type, amount: num, currency, category, date, member: member.trim(), note: note.trim() });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center fade-anim">
+      <div className="absolute inset-0" style={{ background: "rgba(27,42,36,0.5)" }} onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-t-3xl sheet-anim max-h-[92vh] overflow-y-auto" style={{ background: "#FAF7F0" }}>
+        <div className="sticky top-0 flex items-center justify-between px-5 pt-5 pb-3" style={{ background: "#FAF7F0" }}>
+          <h2 className="text-base font-semibold" style={{ color: "#1F2A24" }}>{initial ? t("editEntry") : t("addEntry")}</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-sm" style={{ background: "#F0ECE0", color: "#5B5344" }}>✕</button>
+        </div>
+        <div className="px-5 pb-8 space-y-4">
+          <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid #E8E0CE" }}>
+            <button onClick={() => setType("expense")} className="flex-1 py-2.5 text-sm font-semibold" style={{ background: type === "expense" ? "#B5443C" : "#FFFFFF", color: type === "expense" ? "#fff" : "#5B5344" }}>{t("expense")}</button>
+            <button onClick={() => setType("income")} className="flex-1 py-2.5 text-sm font-semibold" style={{ background: type === "income" ? "#3F7D5C" : "#FFFFFF", color: type === "income" ? "#fff" : "#5B5344" }}>{t("income")}</button>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("amount")}</label>
+            <div className="flex gap-2">
+              <input type="number" inputMode="decimal" value={amount} onChange={(e) => { setAmount(e.target.value); setError(""); }}
+                placeholder="0" className="flex-1 px-3 py-2.5 rounded-xl text-sm outline-none mono"
+                style={{ background: "#FFFFFF", border: "1px solid " + (error ? "#B5443C" : "#E8E0CE"), color: "#1F2A24" }} />
+              <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid #E8E0CE" }}>
+                {["KHR", "USD"].map((c) => (
+                  <button key={c} onClick={() => setCurrency(c)} className="px-3 py-2.5 text-xs font-semibold" style={{ background: currency === c ? "#1B4B43" : "#FFFFFF", color: currency === c ? "#fff" : "#5B5344" }}>{c}</button>
+                ))}
+              </div>
+            </div>
+            {error && <p className="text-xs mt-1" style={{ color: "#B5443C" }}>{error}</p>}
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("category")}</label>
+            <div className="grid grid-cols-4 gap-2">
+              {allCategories.map((cat) => (
+                <button key={cat.id} onClick={() => setCategory(cat.id)}
+                  className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition"
+                  style={{ background: category === cat.id ? cat.color + "22" : "#FFFFFF", border: "1px solid " + (category === cat.id ? cat.color : "#E8E0CE") }}>
+                  <span className="text-base">{cat.icon}</span>
+                  <span className="text-[9px] font-medium text-center leading-tight px-1" style={{ color: category === cat.id ? cat.color : "#5B5344" }}>{lang === "kh" ? cat.kh : cat.en}</span>
+                </button>
+              ))}
+              {!showAddCategory && (
+                <button onClick={() => setShowAddCategory(true)} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition" style={{ background: "#FFFFFF", border: "1px dashed #C9BD98" }}>
+                  <span className="text-base" style={{ color: "#9C9280" }}>＋</span>
+                  <span className="text-[9px] font-medium text-center leading-tight px-1" style={{ color: "#9C9280" }}>{t("addCategory")}</span>
+                </button>
+              )}
+            </div>
+            {showAddCategory && (
+              <div className="mt-2 p-3 rounded-xl" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE" }}>
+                <div className="flex gap-2 mb-2">
+                  <input type="text" value={newCatIcon} onChange={(e) => setNewCatIcon(e.target.value)} placeholder="🏷️" maxLength={4}
+                    className="w-14 px-2 py-2 rounded-lg text-center text-lg outline-none" style={{ background: "#FAF7F0", border: "1px solid #E8E0CE" }} />
+                  <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder={t("categoryName")}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "#FAF7F0", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setShowAddCategory(false); setNewCatIcon(""); setNewCatName(""); }} className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ background: "#F0ECE0", color: "#5B5344" }}>{t("cancel")}</button>
+                  <button onClick={saveNewCategory} className="flex-1 py-2 rounded-lg text-xs font-semibold text-white" style={{ background: "#1B4B43" }}>{t("save")}</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("date")}</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("member")}</label>
+            <input type="text" value={member} onChange={(e) => setMember(e.target.value)}
+              placeholder={lang === "kh" ? "ឧ. ប៉ា, ម៉ាក់" : "e.g. Dad, Mom"}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("note")}</label>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+          </div>
+
+          {currentUser && (
+            <p className="text-[10px]" style={{ color: "#9C9280" }}>{t("recordedBy")}: {currentUser.name}</p>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            {onDelete && (
+              <button onClick={onDelete} className="w-12 rounded-xl flex items-center justify-center flex-shrink-0 text-base" style={{ background: "#FBEAE8" }}>🗑</button>
+            )}
+            <button onClick={submit} className="flex-1 py-3 rounded-xl text-sm font-semibold text-white active:scale-[0.98] transition" style={{ background: "#1B4B43" }}>
+              {t("save")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   AUTH SCREENS
+   ========================================================================= */
+function AuthShell({ lang, setLang, children }) {
+  return (
+    <div className="min-h-screen w-full flex justify-center" style={{ background: "#EFEAE0" }}>
+      <div className="w-full max-w-md min-h-screen relative shadow-2xl flex flex-col" style={{ background: "#FAF7F0" }}>
+        <header className="px-5 pt-6 pb-5" style={{ background: "#1B4B43" }}>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-white text-xl font-semibold tracking-wide">{T.appTitle[lang]}</h1>
+              <p className="text-xs mt-1" style={{ color: "#C89B3C" }}>{T.appSubtitle[lang]}</p>
+            </div>
+            <button onClick={() => setLang((l) => (l === "kh" ? "en" : "kh"))}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium active:scale-95 transition"
+              style={{ background: "rgba(255,255,255,0.12)", color: "#F4EFE2", border: "1px solid rgba(200,155,60,0.5)" }}>
+              🌐 {lang === "kh" ? "EN" : "ខ្មែរ"}
+            </button>
+          </div>
+          <div className="h-[2px] w-full mt-4 rounded-full" style={{ background: "linear-gradient(90deg, #C89B3C, rgba(200,155,60,0.15))" }} />
+        </header>
+        <div className="flex-1 flex flex-col justify-center px-6 py-8">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function SetupAdmin({ lang, t, setLang, onCreate }) {
+  const [username, setUsername] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+
+  function submit() {
+    if (!username.trim() || !password) { setError(t("fieldsRequired")); return; }
+    if (password !== confirm) { setError(t("passwordMismatch")); return; }
+    onCreate({ username: username.trim(), password, name: name.trim() });
+  }
+
+  return (
+    <AuthShell lang={lang} setLang={setLang}>
+      <div className="text-center mb-6">
+        <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center text-2xl" style={{ background: "#EFEAE0" }}>👑</div>
+        <h2 className="text-lg font-semibold" style={{ color: "#1F2A24" }}>{t("setupAdminTitle")}</h2>
+        <p className="text-xs mt-1" style={{ color: "#9C9280" }}>{t("setupAdminSubtitle")}</p>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("username")}</label>
+          <input type="text" value={username} onChange={(e) => { setUsername(e.target.value); setError(""); }}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+        </div>
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("displayName")}</label>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+        </div>
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("password")}</label>
+          <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+        </div>
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("confirmPassword")}</label>
+          <input type="password" value={confirm} onChange={(e) => { setConfirm(e.target.value); setError(""); }}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid " + (error ? "#B5443C" : "#E8E0CE"), color: "#1F2A24" }} />
+        </div>
+        {error && <p className="text-xs" style={{ color: "#B5443C" }}>{error}</p>}
+        <button onClick={submit} className="w-full py-3 rounded-xl text-sm font-semibold text-white active:scale-[0.98] transition mt-2" style={{ background: "#1B4B43" }}>
+          {t("createAdmin")}
+        </button>
+      </div>
+    </AuthShell>
+  );
+}
+
+function LoginScreen({ lang, t, setLang, onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  function submit() {
+    if (!username.trim() || !password) { setError(t("fieldsRequired")); return; }
+    const ok = onLogin(username, password);
+    if (!ok) setError(t("invalidCredentials"));
+  }
+
+  return (
+    <AuthShell lang={lang} setLang={setLang}>
+      <div className="text-center mb-6">
+        <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center text-2xl" style={{ background: "#EFEAE0" }}>🔐</div>
+        <h2 className="text-lg font-semibold" style={{ color: "#1F2A24" }}>{t("loginTitle")}</h2>
+        <p className="text-xs mt-1" style={{ color: "#9C9280" }}>{t("loginSubtitle")}</p>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("username")}</label>
+          <input type="text" value={username} onChange={(e) => { setUsername(e.target.value); setError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+        </div>
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("password")}</label>
+          <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid " + (error ? "#B5443C" : "#E8E0CE"), color: "#1F2A24" }} />
+        </div>
+        {error && <p className="text-xs" style={{ color: "#B5443C" }}>{error}</p>}
+        <button onClick={submit} className="w-full py-3 rounded-xl text-sm font-semibold text-white active:scale-[0.98] transition mt-2" style={{ background: "#1B4B43" }}>
+          {t("login")}
+        </button>
+      </div>
+    </AuthShell>
+  );
+}
+
+function UserForm({ lang, t, initial, existingUsers, onSave, onClose }) {
+  const [username, setUsername] = useState(initial?.username || "");
+  const [name, setName] = useState(initial?.name || "");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+
+  function submit() {
+    if (!username.trim() || (!initial && !password)) { setError(t("fieldsRequired")); return; }
+    const taken = existingUsers.some((u) => u.id !== initial?.id && u.username.toLowerCase() === username.trim().toLowerCase());
+    if (taken) { setError(t("usernameTaken")); return; }
+    if ((password || confirm) && password !== confirm) { setError(t("passwordMismatch")); return; }
+    onSave({ username: username.trim(), name: name.trim(), password });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[55] flex items-end justify-center fade-anim">
+      <div className="absolute inset-0" style={{ background: "rgba(27,42,36,0.5)" }} onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-t-3xl sheet-anim max-h-[88vh] overflow-y-auto" style={{ background: "#FAF7F0" }}>
+        <div className="sticky top-0 flex items-center justify-between px-5 pt-5 pb-3" style={{ background: "#FAF7F0" }}>
+          <h2 className="text-base font-semibold" style={{ color: "#1F2A24" }}>{initial ? t("editAccount") : t("addAccount")}</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-sm" style={{ background: "#F0ECE0", color: "#5B5344" }}>✕</button>
+        </div>
+        <div className="px-5 pb-8 space-y-4">
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("username")}</label>
+            <input type="text" value={username} onChange={(e) => { setUsername(e.target.value); setError(""); }}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("displayName")}</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+              placeholder={lang === "kh" ? "ឧ. ប៉ា, ម៉ាក់" : "e.g. Dad, Mom"}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{initial ? t("newPasswordOptional") : t("password")}</label>
+            <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid " + (error ? "#B5443C" : "#E8E0CE"), color: "#1F2A24" }} />
+          </div>
+          {(password || !initial) && (
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("confirmPassword")}</label>
+              <input type="password" value={confirm} onChange={(e) => { setConfirm(e.target.value); setError(""); }}
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid " + (error ? "#B5443C" : "#E8E0CE"), color: "#1F2A24" }} />
+            </div>
+          )}
+          {error && <p className="text-xs" style={{ color: "#B5443C" }}>{error}</p>}
+          <button onClick={submit} className="w-full py-3 rounded-xl text-sm font-semibold text-white active:scale-[0.98] transition" style={{ background: "#1B4B43" }}>
+            {t("save")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDialog({ t, message, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center fade-anim px-6">
+      <div className="absolute inset-0" style={{ background: "rgba(27,42,36,0.55)" }} onClick={onCancel} />
+      <div className="relative w-full max-w-xs rounded-2xl p-5" style={{ background: "#FAF7F0" }}>
+        <p className="text-sm mb-4" style={{ color: "#1F2A24" }}>{message}</p>
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl text-xs font-medium" style={{ background: "#F0ECE0", color: "#5B5344" }}>{t("cancel")}</button>
+          <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white" style={{ background: "#B5443C" }}>{t("delete")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
