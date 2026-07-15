@@ -1,0 +1,13 @@
+name = "family-expense"
+main = "worker.js"
+compatibility_date = "2026-07-15"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "family-ledger-db"
+database_id = "b5c76fa2-e5e5-4ce1-bb1b-5518c16353c0"
