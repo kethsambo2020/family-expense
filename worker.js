@@ -55,8 +55,13 @@ async function handleApi(request, env, url) {
   }
 
   if (resource === "categories") {
-    if (method === "GET") return listCategories(env);
-    if (method === "POST") return createCategory(request, env);
+    if (!id) {
+      if (method === "GET") return listCategories(env);
+      if (method === "POST") return createCategory(request, env);
+    } else {
+      if (method === "PUT") return updateCategory(request, env, id);
+      if (method === "DELETE") return deleteCategory(env, id);
+    }
   }
 
   return json({ error: "not found" }, { status: 404 });
@@ -158,4 +163,21 @@ async function createCategory(request, env) {
     "INSERT OR REPLACE INTO categories (id, icon, en, kh, color) VALUES (?,?,?,?,?)"
   ).bind(data.id, data.icon || "🏷️", data.en, data.kh || data.en, data.color || "#7A6A4A").run();
   return json(data);
+}
+async function updateCategory(request, env, id) {
+  const data = await request.json();
+  const fields = [];
+  const values = [];
+  if (data.icon !== undefined) { fields.push("icon = ?"); values.push(data.icon); }
+  if (data.en !== undefined) { fields.push("en = ?"); values.push(data.en); }
+  if (data.kh !== undefined) { fields.push("kh = ?"); values.push(data.kh); }
+  if (data.color !== undefined) { fields.push("color = ?"); values.push(data.color); }
+  if (fields.length === 0) return json({ ok: true });
+  values.push(id);
+  await env.DB.prepare(`UPDATE categories SET ${fields.join(", ")} WHERE id = ?`).bind(...values).run();
+  return json({ ok: true });
+}
+async function deleteCategory(env, id) {
+  await env.DB.prepare("DELETE FROM categories WHERE id = ?").bind(id).run();
+  return json({ ok: true });
 }
