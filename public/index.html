@@ -123,6 +123,7 @@ const T = {
   fieldsRequired: { en: "Please fill in all required fields", kh: "សូមបំពេញព័ត៌មានទាំងអស់ដែលត្រូវការ" },
   noAccountsYet: { en: "No family accounts yet", kh: "មិនទាន់មានគណនីគ្រួសារនៅឡើយទេ" },
   addCategory: { en: "Add category", kh: "បន្ថែមចំណាត់ថ្នាក់" },
+  editCategory: { en: "Edit category", kh: "កែសម្រួលចំណាត់ថ្នាក់" },
   categoryName: { en: "Category name", kh: "ឈ្មោះចំណាត់ថ្នាក់" },
   chooseIcon: { en: "Choose an icon", kh: "ជ្រើសរើស Icon" },
   navHome: { en: "Home", kh: "ទំព័រដើម" },
@@ -329,6 +330,12 @@ function App() {
     });
     await refetchCategories();
   }
+  async function handleEditCategory(id, data) {
+    await fetch(API_BASE + "/categories/" + id, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+    });
+    await refetchCategories();
+  }
 
   /* ---- Entries ---- */
   const years = useMemo(() => {
@@ -436,7 +443,7 @@ function App() {
 
       {showForm && (
         <EntryForm lang={lang} t={t} initial={editingTx} allCategories={allCategories}
-          currentUser={currentUser} onAddCategory={handleAddCategory}
+          currentUser={currentUser} onAddCategory={handleAddCategory} onEditCategory={handleEditCategory}
           onSave={handleSave} onClose={() => { setShowForm(false); setEditingTx(null); }}
           onDelete={editingTx ? () => setConfirmDeleteId(editingTx.id) : null} />
       )}
@@ -827,7 +834,7 @@ function AccountsPage({ lang, t, users, onAdd, onEdit, onDeleteRequest }) {
 /* =========================================================================
    ENTRY FORM (sheet)
    ========================================================================= */
-function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory, onSave, onClose, onDelete }) {
+function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory, onEditCategory, onSave, onClose, onDelete }) {
   const [type, setType] = useState(initial?.type || "expense");
   const [amount, setAmount] = useState(initial?.amount ? String(initial.amount) : "");
   const [currency, setCurrency] = useState(initial?.currency || "USD");
@@ -837,15 +844,34 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory
   const [note, setNote] = useState(initial?.note || "");
   const [error, setError] = useState("");
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [newCatIcon, setNewCatIcon] = useState("");
   const [newCatName, setNewCatName] = useState("");
 
-  function saveNewCategory() {
+  function openAddCategoryPanel() {
+    setEditingCategoryId(null);
+    setNewCatIcon(""); setNewCatName("");
+    setShowAddCategory(true);
+  }
+  function openEditCategoryPanel(cat, e) {
+    e.stopPropagation();
+    setEditingCategoryId(cat.id);
+    setNewCatIcon(cat.icon); setNewCatName(lang === "kh" ? cat.kh : cat.en);
+    setShowAddCategory(true);
+  }
+  function closeCategoryPanel() {
+    setShowAddCategory(false); setEditingCategoryId(null); setNewCatIcon(""); setNewCatName("");
+  }
+  function saveCategory() {
     if (!newCatName.trim()) return;
-    const id = "custom_" + Date.now().toString(36);
-    onAddCategory({ id, icon: newCatIcon || "🏷️", en: newCatName.trim(), kh: newCatName.trim(), color: "#7A6A4A" });
-    setCategory(id);
-    setShowAddCategory(false); setNewCatIcon(""); setNewCatName("");
+    if (editingCategoryId) {
+      onEditCategory(editingCategoryId, { icon: newCatIcon || "🏷️", en: newCatName.trim(), kh: newCatName.trim() });
+    } else {
+      const id = "custom_" + Date.now().toString(36);
+      onAddCategory({ id, icon: newCatIcon || "🏷️", en: newCatName.trim(), kh: newCatName.trim(), color: "#7A6A4A" });
+      setCategory(id);
+    }
+    closeCategoryPanel();
   }
 
   function submit() {
@@ -882,16 +908,24 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("category")}</label>
             <div className="grid grid-cols-4 gap-2">
-              {allCategories.map((cat) => (
-                <button key={cat.id} onClick={() => setCategory(cat.id)}
-                  className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition"
-                  style={{ background: category === cat.id ? cat.color + "22" : "#FFFFFF", border: "1px solid " + (category === cat.id ? cat.color : "#E8E0CE") }}>
-                  <span className="text-base">{cat.icon}</span>
-                  <span className="text-[9px] font-medium text-center leading-tight px-1" style={{ color: category === cat.id ? cat.color : "#5B5344" }}>{lang === "kh" ? cat.kh : cat.en}</span>
-                </button>
-              ))}
+              {allCategories.map((cat) => {
+                const isCustom = cat.id.startsWith("custom_");
+                return (
+                  <button key={cat.id} onClick={() => setCategory(cat.id)}
+                    className="relative flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition"
+                    style={{ background: category === cat.id ? cat.color + "22" : "#FFFFFF", border: "1px solid " + (category === cat.id ? cat.color : "#E8E0CE") }}>
+                    {isCustom && (
+                      <span onClick={(e) => openEditCategoryPanel(cat, e)}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px]"
+                        style={{ background: "#1B4B43", color: "#fff" }}>✎</span>
+                    )}
+                    <span className="text-base">{cat.icon}</span>
+                    <span className="text-[9px] font-medium text-center leading-tight px-1" style={{ color: category === cat.id ? cat.color : "#5B5344" }}>{lang === "kh" ? cat.kh : cat.en}</span>
+                  </button>
+                );
+              })}
               {!showAddCategory && (
-                <button onClick={() => setShowAddCategory(true)} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition" style={{ background: "#FFFFFF", border: "1px dashed #C9BD98" }}>
+                <button onClick={openAddCategoryPanel} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition" style={{ background: "#FFFFFF", border: "1px dashed #C9BD98" }}>
                   <span className="text-base" style={{ color: "#9C9280" }}>＋</span>
                   <span className="text-[9px] font-medium text-center leading-tight px-1" style={{ color: "#9C9280" }}>{t("addCategory")}</span>
                 </button>
@@ -899,6 +933,7 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory
             </div>
             {showAddCategory && (
               <div className="mt-2 p-3 rounded-xl" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE" }}>
+                <p className="text-xs font-semibold mb-2" style={{ color: "#1F2A24" }}>{editingCategoryId ? t("editCategory") : t("addCategory")}</p>
                 <label className="text-[10px] font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("chooseIcon")}</label>
                 <div className="grid grid-cols-8 gap-1.5 mb-3 max-h-32 overflow-y-auto">
                   {ICON_PALETTE.map((ic) => (
@@ -912,8 +947,8 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory
                 <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder={t("categoryName")}
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none mb-2" style={{ background: "#FAF7F0", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
                 <div className="flex gap-2">
-                  <button onClick={() => { setShowAddCategory(false); setNewCatIcon(""); setNewCatName(""); }} className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ background: "#F0ECE0", color: "#5B5344" }}>{t("cancel")}</button>
-                  <button onClick={saveNewCategory} className="flex-1 py-2 rounded-lg text-xs font-semibold text-white" style={{ background: "#1B4B43" }}>{t("save")}</button>
+                  <button onClick={closeCategoryPanel} className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ background: "#F0ECE0", color: "#5B5344" }}>{t("cancel")}</button>
+                  <button onClick={saveCategory} className="flex-1 py-2 rounded-lg text-xs font-semibold text-white" style={{ background: "#1B4B43" }}>{t("save")}</button>
                 </div>
               </div>
             )}
