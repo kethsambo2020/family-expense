@@ -64,6 +64,16 @@ async function handleApi(request, env, url) {
     }
   }
 
+  if (resource === "savings") {
+    if (!id) {
+      if (method === "GET") return listSavings(env);
+      if (method === "POST") return createSavings(request, env);
+    } else {
+      if (method === "PUT") return updateSavings(request, env, id);
+      if (method === "DELETE") return deleteSavings(env, id);
+    }
+  }
+
   return json({ error: "not found" }, { status: 404 });
 }
 
@@ -179,5 +189,49 @@ async function updateCategory(request, env, id) {
 }
 async function deleteCategory(env, id) {
   await env.DB.prepare("DELETE FROM categories WHERE id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
+/* ---- savings goals ---- */
+async function listSavings(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT id, name, icon, target_amount AS targetAmount, current_amount AS currentAmount,
+            deadline, note, created_by_name AS createdByName, created_by_user_id AS createdByUserId,
+            created_at AS createdAt
+     FROM savings ORDER BY created_at ASC`
+  ).all();
+  return json(results);
+}
+async function createSavings(request, env) {
+  const data = await request.json();
+  if (!data.name || data.targetAmount === undefined) {
+    return json({ error: "missing fields" }, { status: 400 });
+  }
+  const id = uid();
+  const createdAt = Date.now();
+  await env.DB.prepare(
+    `INSERT INTO savings (id, name, icon, target_amount, current_amount, deadline, note, created_by_name, created_by_user_id, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`
+  ).bind(
+    id, data.name, data.icon || "🐷", data.targetAmount, data.currentAmount || 0,
+    data.deadline || "", data.note || "", data.createdByName || "", data.createdByUserId || "", createdAt
+  ).run();
+  return json({ id, ...data, createdAt });
+}
+async function updateSavings(request, env, id) {
+  const data = await request.json();
+  const map = { name: "name", icon: "icon", targetAmount: "target_amount", currentAmount: "current_amount", deadline: "deadline", note: "note" };
+  const fields = [];
+  const values = [];
+  for (const k in map) {
+    if (data[k] !== undefined) { fields.push(`${map[k]} = ?`); values.push(data[k]); }
+  }
+  if (fields.length === 0) return json({ ok: true });
+  values.push(id);
+  await env.DB.prepare(`UPDATE savings SET ${fields.join(", ")} WHERE id = ?`).bind(...values).run();
+  return json({ ok: true });
+}
+async function deleteSavings(env, id) {
+  await env.DB.prepare("DELETE FROM savings WHERE id = ?").bind(id).run();
   return json({ ok: true });
 }
