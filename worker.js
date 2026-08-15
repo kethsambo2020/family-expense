@@ -106,6 +106,7 @@ async function updateUser(request, env, id) {
   const values = [];
   if (data.username !== undefined) { fields.push("username = ?"); values.push(data.username); }
   if (data.name !== undefined) { fields.push("name = ?"); values.push(data.name); }
+  if (data.role !== undefined) { fields.push("role = ?"); values.push(data.role); }
   if (data.password) { fields.push("password = ?"); values.push(data.password); }
   if (fields.length === 0) return json({ ok: true });
   values.push(id);
