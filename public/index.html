@@ -403,9 +403,10 @@ function App() {
       const d = new Date(tx.date);
       const okYear = filterYear === "all" || d.getFullYear() === filterYear;
       const okMonth = filterMonth === "all" || d.getMonth() === filterMonth;
-      return okYear && okMonth;
+      const okUser = filterUser === "all" || tx.createdByUserId === filterUser;
+      return okYear && okMonth && okUser;
     }).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.createdAt || 0) - (a.createdAt || 0)));
-  }, [entries, filterMonth, filterYear]);
+  }, [entries, filterMonth, filterYear, filterUser]);
 
   const totals = useMemo(() => {
     const t0 = { KHR: { income: 0, expense: 0 }, USD: { income: 0, expense: 0 } };
@@ -489,6 +490,7 @@ function App() {
               t={t} lang={lang} grouped={grouped} allCategories={allCategories}
               filterMonth={filterMonth} setFilterMonth={setFilterMonth}
               filterYear={filterYear} setFilterYear={setFilterYear} years={years}
+              users={users} filterUser={filterUser} setFilterUser={setFilterUser}
               onAdd={openAdd} onEdit={openEdit} onDeleteRequest={setConfirmDeleteId}
             />
           )}
@@ -828,7 +830,7 @@ function SummaryCard({ label, value, color, icon }) {
 /* =========================================================================
    RECORD PAGE  (list + add/edit like the original app)
    ========================================================================= */
-function RecordPage({ t, lang, grouped, allCategories, filterMonth, setFilterMonth, filterYear, setFilterYear, years, onAdd, onEdit, onDeleteRequest }) {
+function RecordPage({ t, lang, grouped, allCategories, filterMonth, setFilterMonth, filterYear, setFilterYear, years, users, filterUser, setFilterUser, onAdd, onEdit, onDeleteRequest }) {
   return (
     <div className="space-y-4 pb-20">
       <div className="flex flex-wrap gap-2 items-center">
@@ -845,6 +847,22 @@ function RecordPage({ t, lang, grouped, allCategories, filterMonth, setFilterMon
         <button onClick={onAdd} className="ml-auto px-4 py-2 rounded-xl text-xs font-semibold text-white active:scale-95 transition" style={{ background: "#1B4B43" }}>
           + {t("newRecordButton")}
         </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="text-xs font-medium flex-shrink-0" style={{ color: "#8A7C56" }}>{t("filterMember")}:</span>
+        <button onClick={() => setFilterUser("all")}
+          className="px-3 py-1.5 rounded-full text-xs font-medium transition"
+          style={{ background: filterUser === "all" ? "#1B4B43" : "#FFFFFF", color: filterUser === "all" ? "#fff" : "#5B5344", border: "1px solid #E8E0CE" }}>
+          {t("all")}
+        </button>
+        {users.map((u) => (
+          <button key={u.id} onClick={() => setFilterUser(u.id)}
+            className="px-3 py-1.5 rounded-full text-xs font-medium transition"
+            style={{ background: filterUser === u.id ? "#1B4B43" : "#FFFFFF", color: filterUser === u.id ? "#fff" : "#5B5344", border: "1px solid #E8E0CE" }}>
+            {u.name}
+          </button>
+        ))}
       </div>
 
       {grouped.length === 0 ? (
