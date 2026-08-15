@@ -118,6 +118,7 @@ const T = {
   newPasswordOptional: { en: "New password (leave blank to keep current)", kh: "ពាក្យសម្ងាត់ថ្មី (ទុកចោលបើមិនប្តូរ)" },
   roleAdmin: { en: "Admin", kh: "អ្នកគ្រប់គ្រង" },
   roleMember: { en: "Member", kh: "សមាជិក" },
+  role: { en: "Role", kh: "តួនាទី" },
   usernameTaken: { en: "This username is already taken", kh: "ឈ្មោះអ្នកប្រើនេះប្រើរួចហើយ" },
   passwordMismatch: { en: "Passwords do not match", kh: "ពាក្យសម្ងាត់មិនត្រូវគ្នា" },
   fieldsRequired: { en: "Please fill in all required fields", kh: "សូមបំពេញព័ត៌មានទាំងអស់ដែលត្រូវការ" },
@@ -146,6 +147,7 @@ const T = {
   goalReached: { en: "Goal reached! 🎉", kh: "សម្រេចគោលដៅ! 🎉" },
   remaining: { en: "remaining", kh: "នៅសល់" },
   confirmDeleteGoal: { en: "Delete this savings goal?", kh: "តើអ្នកប្រាកដថាចង់លុបគោលដៅសន្សំនេះមែនទេ?" },
+  linkToSavings: { en: "Move this amount into a savings goal", kh: "ផ្ទេរចំនួននេះទៅកាន់គោលដៅសន្សំ" },
   filterMonth: { en: "Month", kh: "ខែ" },
   filterYear: { en: "Year", kh: "ឆ្នាំ" },
   filterMember: { en: "Member", kh: "សមាជិក" },
@@ -325,7 +327,7 @@ function App() {
   function openEditUser(u) { setEditingUser(u); setShowUserForm(true); }
   async function handleSaveUser(data) {
     if (editingUser) {
-      const upd = { username: data.username, name: data.name || data.username };
+      const upd = { username: data.username, name: data.name || data.username, role: data.role };
       if (data.password) upd.password = data.password;
       await fetch(API_BASE + "/users/" + editingUser.id, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(upd),
@@ -333,7 +335,7 @@ function App() {
     } else {
       await fetch(API_BASE + "/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: data.username, password: data.password, name: data.name || data.username, role: "member" }),
+        body: JSON.stringify({ username: data.username, password: data.password, name: data.name || data.username, role: data.role || "member" }),
       });
     }
     await refetchUsers();
@@ -423,19 +425,30 @@ function App() {
   function openAdd() { setEditingTx(null); setShowForm(true); }
   function openEdit(tx) { setEditingTx(tx); setShowForm(true); }
   async function handleSave(data) {
+    const { linkedSavingsGoalId, ...entryData } = data;
     if (editingTx) {
       await fetch(API_BASE + "/entries/" + editingTx.id, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(entryData),
       });
     } else {
       await fetch(API_BASE + "/entries", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...data,
+          ...entryData,
           createdByName: currentUser ? currentUser.name : "",
           createdByUserId: currentUser ? currentUser.id : "",
         }),
       });
+    }
+    if (linkedSavingsGoalId) {
+      const goal = savings.find((g) => g.id === linkedSavingsGoalId);
+      if (goal) {
+        const newAmount = Number(goal.currentAmount) + Number(entryData.amount);
+        await fetch(API_BASE + "/savings/" + goal.id, {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ currentAmount: newAmount }),
+        });
+        await refetchSavings();
+      }
     }
     await refetchEntries();
     setShowForm(false); setEditingTx(null);
@@ -506,7 +519,7 @@ function App() {
       </div>
 
       {showForm && (
-        <EntryForm lang={lang} t={t} initial={editingTx} allCategories={allCategories}
+        <EntryForm lang={lang} t={t} initial={editingTx} allCategories={allCategories} savings={savings}
           currentUser={currentUser} onAddCategory={handleAddCategory} onEditCategory={handleEditCategory}
           onSave={handleSave} onClose={() => { setShowForm(false); setEditingTx(null); }}
           onDelete={editingTx ? () => setConfirmDeleteId(editingTx.id) : null} />
@@ -1090,7 +1103,7 @@ function AdjustGoalModal({ lang, t, goal, onSave, onClose }) {
 /* =========================================================================
    ENTRY FORM (sheet)
    ========================================================================= */
-function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory, onEditCategory, onSave, onClose, onDelete }) {
+function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAddCategory, onEditCategory, onSave, onClose, onDelete }) {
   const [type, setType] = useState(initial?.type || "expense");
   const [amount, setAmount] = useState(initial?.amount ? String(initial.amount) : "");
   const [currency, setCurrency] = useState(initial?.currency || "USD");
@@ -1103,6 +1116,8 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [newCatIcon, setNewCatIcon] = useState("");
   const [newCatName, setNewCatName] = useState("");
+  const [linkSavings, setLinkSavings] = useState(false);
+  const [savingsGoalId, setSavingsGoalId] = useState(savings && savings[0] ? savings[0].id : "");
 
   function openAddCategoryPanel() {
     setEditingCategoryId(null);
@@ -1133,7 +1148,10 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory
   function submit() {
     const num = Number(amount);
     if (!amount || isNaN(num) || num <= 0) { setError(t("amountRequired")); return; }
-    onSave({ type, amount: num, currency, category, date, member: member.trim(), note: note.trim() });
+    onSave({
+      type, amount: num, currency, category, date, member: member.trim(), note: note.trim(),
+      linkedSavingsGoalId: (type === "expense" && linkSavings && savingsGoalId) ? savingsGoalId : null,
+    });
   }
 
   return (
@@ -1210,8 +1228,23 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, onAddCategory
             )}
           </div>
 
+          {type === "expense" && savings && savings.length > 0 && (
+            <div className="p-3 rounded-xl" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE" }}>
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={linkSavings} onChange={(e) => setLinkSavings(e.target.checked)}
+                  className="w-4 h-4 flex-shrink-0" />
+                <span className="text-xs font-medium" style={{ color: "#1F2A24" }}>🐷 {t("linkToSavings")}</span>
+              </label>
+              {linkSavings && (
+                <select value={savingsGoalId} onChange={(e) => setSavingsGoalId(e.target.value)}
+                  className="w-full mt-2.5 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "#FAF7F0", border: "1px solid #E8E0CE", color: "#1F2A24" }}>
+                  {savings.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
+                </select>
+              )}
+            </div>
+          )}
+
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("date")}</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
           </div>
@@ -1372,6 +1405,7 @@ function LoginScreen({ lang, t, setLang, onLogin }) {
 function UserForm({ lang, t, initial, existingUsers, onSave, onClose }) {
   const [username, setUsername] = useState(initial?.username || "");
   const [name, setName] = useState(initial?.name || "");
+  const [role, setRole] = useState(initial?.role || "member");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -1381,7 +1415,7 @@ function UserForm({ lang, t, initial, existingUsers, onSave, onClose }) {
     const taken = existingUsers.some((u) => u.id !== initial?.id && u.username.toLowerCase() === username.trim().toLowerCase());
     if (taken) { setError(t("usernameTaken")); return; }
     if ((password || confirm) && password !== confirm) { setError(t("passwordMismatch")); return; }
-    onSave({ username: username.trim(), name: name.trim(), password });
+    onSave({ username: username.trim(), name: name.trim(), role, password });
   }
 
   return (
@@ -1403,6 +1437,19 @@ function UserForm({ lang, t, initial, existingUsers, onSave, onClose }) {
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder={lang === "kh" ? "ឧ. ប៉ា, ម៉ាក់" : "e.g. Dad, Mom"}
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("role")}</label>
+            <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid #E8E0CE" }}>
+              <button type="button" onClick={() => setRole("member")}
+                className="flex-1 py-2.5 text-sm font-semibold" style={{ background: role === "member" ? "#1B4B43" : "#FFFFFF", color: role === "member" ? "#fff" : "#5B5344" }}>
+                {t("roleMember")}
+              </button>
+              <button type="button" onClick={() => setRole("admin")}
+                className="flex-1 py-2.5 text-sm font-semibold" style={{ background: role === "admin" ? "#1B4B43" : "#FFFFFF", color: role === "admin" ? "#fff" : "#5B5344" }}>
+                {t("roleAdmin")}
+              </button>
+            </div>
           </div>
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{initial ? t("newPasswordOptional") : t("password")}</label>
