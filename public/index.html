@@ -142,6 +142,7 @@ const T = {
   confirmDeleteGoal: { en: "Delete this savings record?", kh: "តើអ្នកប្រាកដថាចង់លុបកំណត់ត្រាការសន្សំនេះមែនទេ?" },
   linkToSavings: { en: "Also record this as savings", kh: "កត់ត្រាចំនួននេះទុកជាការសន្សំផងដែរ" },
   savingsLabel: { en: "Savings label (optional)", kh: "ឈ្មោះការសន្សំ (មិនចាំបាច់)" },
+  autoDetected: { en: "auto-detected", kh: "ស្គាល់ស្វ័យប្រវត្តិ" },
   filterMonth: { en: "Month", kh: "ខែ" },
   filterYear: { en: "Year", kh: "ឆ្នាំ" },
   filterMember: { en: "Member", kh: "សមាជិក" },
@@ -429,7 +430,7 @@ function App() {
         }),
       });
     }
-    if (savingsLabel) {
+    if (savingsLabel && !editingTx) {
       const cat = allCategories.find((c) => c.id === entryData.category);
       await fetch(API_BASE + "/savings", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1116,6 +1117,32 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
   const [newCatName, setNewCatName] = useState("");
   const [linkSavings, setLinkSavings] = useState(false);
   const [savingsLabel, setSavingsLabel] = useState("");
+  const [autoDetected, setAutoDetected] = useState(false);
+
+  // Auto-detect: if the chosen category looks like a "savings" category
+  // (name contains "saving" or "សន្សំ"), automatically also log this amount
+  // into the Savings page, using the note (or category name) as the label.
+  useEffect(() => {
+    const cat = allCategories.find((c) => c.id === category);
+    if (!cat) return;
+    const nameMatch = (cat.en + " " + cat.kh).toLowerCase().includes("saving") || cat.kh.includes("សន្សំ");
+    if (nameMatch) {
+      setLinkSavings(true);
+      setAutoDetected(true);
+      setSavingsLabel(note.trim() || (lang === "kh" ? cat.kh : cat.en));
+    } else if (autoDetected) {
+      setLinkSavings(false);
+      setAutoDetected(false);
+      setSavingsLabel("");
+    }
+  }, [category]);
+
+  useEffect(() => {
+    if (autoDetected && linkSavings) {
+      const cat = allCategories.find((c) => c.id === category);
+      setSavingsLabel(note.trim() || (cat ? (lang === "kh" ? cat.kh : cat.en) : ""));
+    }
+  }, [note]);
 
   function openAddCategoryPanel() {
     setEditingCategoryId(null);
@@ -1227,15 +1254,17 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
             )}
           </div>
 
-          {type === "expense" && (
+          {type === "expense" && !initial && (
             <div className="p-3 rounded-xl" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE" }}>
               <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={linkSavings} onChange={(e) => setLinkSavings(e.target.checked)}
+                <input type="checkbox" checked={linkSavings}
+                  onChange={(e) => { setLinkSavings(e.target.checked); setAutoDetected(false); }}
                   className="w-4 h-4 flex-shrink-0" />
                 <span className="text-xs font-medium" style={{ color: "#1F2A24" }}>🐷 {t("linkToSavings")}</span>
+                {autoDetected && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "#EAF3ED", color: "#3F7D5C" }}>{t("autoDetected")}</span>}
               </label>
               {linkSavings && (
-                <input type="text" value={savingsLabel} onChange={(e) => setSavingsLabel(e.target.value)}
+                <input type="text" value={savingsLabel} onChange={(e) => { setSavingsLabel(e.target.value); setAutoDetected(false); }}
                   placeholder={t("savingsLabel")}
                   className="w-full mt-2.5 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "#FAF7F0", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
               )}
