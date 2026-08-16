@@ -131,29 +131,25 @@ const T = {
   navRecord: { en: "Record", kh: "កត់ត្រា" },
   navAccounts: { en: "Accounts", kh: "គណនី" },
   navSavings: { en: "Savings", kh: "ការសន្សំ" },
-  savingsGoals: { en: "Savings goals", kh: "គោលដៅសន្សំ" },
-  newSavingsGoal: { en: "New savings goal", kh: "គោលដៅសន្សំថ្មី" },
-  editSavingsGoal: { en: "Edit savings goal", kh: "កែសម្រួលគោលដៅសន្សំ" },
-  goalName: { en: "Goal name", kh: "ឈ្មោះគោលដៅ" },
-  targetAmount: { en: "Target amount", kh: "ចំនួនគោលដៅ" },
-  currentAmount: { en: "Current saved", kh: "សន្សំបានហើយ" },
-  deadline: { en: "Target date (optional)", kh: "កាលបរិច្ឆេទគោលដៅ (មិនចាំបាច់)" },
-  noSavingsGoals: { en: "No savings goals yet", kh: "មិនទាន់មានគោលដៅសន្សំទេ" },
-  noSavingsGoalsSub: { en: "Create a goal to start saving toward something.", kh: "បង្កើតគោលដៅមួយ ដើម្បីចាប់ផ្តើមសន្សំ។" },
-  addMoney: { en: "Add money", kh: "បញ្ចូលលុយ" },
+  savingsGoals: { en: "Savings records", kh: "កំណត់ត្រាការសន្សំ" },
+  newSavingsGoal: { en: "New savings record", kh: "កត់ត្រាការសន្សំថ្មី" },
+  editSavingsGoal: { en: "Edit savings record", kh: "កែសម្រួលការសន្សំ" },
+  goalName: { en: "Savings type", kh: "ប្រភេទសន្សំ" },
+  noSavingsGoals: { en: "No savings recorded yet", kh: "មិនទាន់មានកំណត់ត្រាការសន្សំទេ" },
+  noSavingsGoalsSub: { en: "Tap + to record your first saving.", kh: "ចុច + ដើម្បីកត់ត្រាការសន្សំដំបូងរបស់អ្នក។" },
+  savingsDeposit: { en: "Save", kh: "សន្សំ" },
   withdraw: { en: "Withdraw", kh: "ដកលុយ" },
-  amountToAdd: { en: "Amount to add", kh: "ចំនួនទឹកប្រាក់ត្រូវបញ្ចូល" },
-  amountToWithdraw: { en: "Amount to withdraw", kh: "ចំនួនទឹកប្រាក់ត្រូវដក" },
-  goalReached: { en: "Goal reached! 🎉", kh: "សម្រេចគោលដៅ! 🎉" },
-  remaining: { en: "remaining", kh: "នៅសល់" },
-  confirmDeleteGoal: { en: "Delete this savings goal?", kh: "តើអ្នកប្រាកដថាចង់លុបគោលដៅសន្សំនេះមែនទេ?" },
-  linkToSavings: { en: "Move this amount into a savings goal", kh: "ផ្ទេរចំនួននេះទៅកាន់គោលដៅសន្សំ" },
+  confirmDeleteGoal: { en: "Delete this savings record?", kh: "តើអ្នកប្រាកដថាចង់លុបកំណត់ត្រាការសន្សំនេះមែនទេ?" },
+  linkToSavings: { en: "Also record this as savings", kh: "កត់ត្រាចំនួននេះទុកជាការសន្សំផងដែរ" },
+  savingsLabel: { en: "Savings label (optional)", kh: "ឈ្មោះការសន្សំ (មិនចាំបាច់)" },
   filterMonth: { en: "Month", kh: "ខែ" },
   filterYear: { en: "Year", kh: "ឆ្នាំ" },
   filterMember: { en: "Member", kh: "សមាជិក" },
   totalIncome: { en: "Total income", kh: "ចំណូលសរុប" },
   totalExpense: { en: "Total expense", kh: "ចំណាយសរុប" },
   netBalance: { en: "Net balance", kh: "សមតុល្យសុទ្ធ" },
+  totalSavings: { en: "Total savings", kh: "សរុបការសន្សំ" },
+  viewAll: { en: "View all", kh: "មើលទាំងអស់" },
   trendChart: { en: "Income vs Expense by month", kh: "និន្នាការចំណូល-ចំណាយតាមខែ" },
   categoryChart: { en: "Expense by category", kh: "ចំណាយតាមចំណាត់ថ្នាក់" },
   noChartData: { en: "Not enough data to show a chart yet", kh: "មិនទាន់មានទិន្នន័យគ្រប់គ្រាន់សម្រាប់បង្ហាញក្រាហ្វិកទេ" },
@@ -292,7 +288,6 @@ function App() {
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
   const [confirmDeleteGoalId, setConfirmDeleteGoalId] = useState(null);
-  const [adjustGoal, setAdjustGoal] = useState(null);
 
   const now = new Date();
   const [filterMonth, setFilterMonth] = useState(now.getMonth());
@@ -383,13 +378,6 @@ function App() {
     await refetchSavings();
     setConfirmDeleteGoalId(null);
   }
-  async function handleAdjustGoal(goal, newAmount) {
-    await fetch(API_BASE + "/savings/" + goal.id, {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ currentAmount: newAmount }),
-    });
-    await refetchSavings();
-    setAdjustGoal(null);
-  }
 
   /* ---- Entries ---- */
   const years = useMemo(() => {
@@ -426,7 +414,7 @@ function App() {
   function openAdd() { setEditingTx(null); setShowForm(true); }
   function openEdit(tx) { setEditingTx(tx); setShowForm(true); }
   async function handleSave(data) {
-    const { linkedSavingsGoalId, ...entryData } = data;
+    const { savingsLabel, ...entryData } = data;
     if (editingTx) {
       await fetch(API_BASE + "/entries/" + editingTx.id, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(entryData),
@@ -441,15 +429,17 @@ function App() {
         }),
       });
     }
-    if (linkedSavingsGoalId) {
-      const goal = savings.find((g) => g.id === linkedSavingsGoalId);
-      if (goal) {
-        const newAmount = Number(goal.currentAmount) + Number(entryData.amount);
-        await fetch(API_BASE + "/savings/" + goal.id, {
-          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ currentAmount: newAmount }),
-        });
-        await refetchSavings();
-      }
+    if (savingsLabel) {
+      const cat = allCategories.find((c) => c.id === entryData.category);
+      await fetch(API_BASE + "/savings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: savingsLabel, icon: cat ? cat.icon : "🐷", targetAmount: 0,
+          currentAmount: Number(entryData.amount), deadline: entryData.date,
+          createdByName: currentUser ? currentUser.name : "", createdByUserId: currentUser ? currentUser.id : "",
+        }),
+      });
+      await refetchSavings();
     }
     await refetchEntries();
     setShowForm(false); setEditingTx(null);
@@ -482,7 +472,7 @@ function App() {
               filterMonth={filterMonth} setFilterMonth={setFilterMonth}
               filterYear={filterYear} setFilterYear={setFilterYear} years={years}
               users={users} filterUser={filterUser} setFilterUser={setFilterUser}
-              allCategories={allCategories}
+              allCategories={allCategories} savings={savings} setPage={setPage}
             />
           )}
           {page === "record" && (
@@ -504,7 +494,6 @@ function App() {
             <SavingsPage
               lang={lang} t={t} savings={savings}
               onAdd={openAddGoal} onEdit={openEditGoal} onDeleteRequest={setConfirmDeleteGoalId}
-              onAdjust={setAdjustGoal}
             />
           )}
         </div>
@@ -546,10 +535,6 @@ function App() {
       {confirmDeleteGoalId && (
         <ConfirmDialog t={t} message={t("confirmDeleteGoal")}
           onConfirm={() => handleDeleteGoal(confirmDeleteGoalId)} onCancel={() => setConfirmDeleteGoalId(null)} />
-      )}
-      {adjustGoal && (
-        <AdjustGoalModal lang={lang} t={t} goal={adjustGoal}
-          onSave={(newAmount) => handleAdjustGoal(adjustGoal, newAmount)} onClose={() => setAdjustGoal(null)} />
       )}
     </div>
   );
@@ -635,7 +620,7 @@ function TopBar({ lang, setLang, t, page, currentUser, onLogout }) {
 /* =========================================================================
    HOME / DASHBOARD PAGE
    ========================================================================= */
-function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMonth, filterYear, setFilterYear, years, users, filterUser, setFilterUser, allCategories }) {
+function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMonth, filterYear, setFilterYear, years, users, filterUser, setFilterUser, allCategories, savings, setPage }) {
   const barRef = useRef(null);
   const pieRef = useRef(null);
   const barChart = useRef(null);
@@ -654,6 +639,10 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
     });
     return { income, expense };
   }, [visibleEntries]);
+
+  const totalSaved = useMemo(() => {
+    return (savings || []).reduce((sum, g) => sum + Number(g.currentAmount || 0), 0);
+  }, [savings]);
 
   const barData = useMemo(() => {
     const year = filterYear === "all" ? new Date().getFullYear() : filterYear;
@@ -766,10 +755,11 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <SummaryCard label={t("totalIncome")} value={fmt(usdTotals.income, "USD")} color="#3F7D5C" icon="⬆️" />
         <SummaryCard label={t("totalExpense")} value={fmt(usdTotals.expense, "USD")} color="#B5443C" icon="⬇️" />
         <SummaryCard label={t("netBalance")} value={fmt(usdTotals.income - usdTotals.expense, "USD")} color="#1B4B43" icon="⚖️" />
+        <SummaryCard label={t("totalSavings")} value={fmt(totalSaved, "USD")} color="#C89B3C" icon="🐷" />
       </div>
 
       {/* Charts */}
@@ -787,6 +777,33 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
           )}
         </div>
       </div>
+
+      {/* Savings overview */}
+      {savings && savings.length > 0 && (
+        <div className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold" style={{ color: "#5B5344" }}>🐷 {t("savingsGoals")}</h3>
+            <button onClick={() => setPage("savings")} className="text-[10px] font-semibold" style={{ color: "#1B4B43" }}>{t("viewAll")} →</button>
+          </div>
+          <div className="space-y-1">
+            {savings.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5).map((g) => {
+              const isWithdraw = Number(g.currentAmount) < 0;
+              return (
+                <div key={g.id} className="flex items-center gap-3 py-2" style={{ borderTop: "1px solid #F3EEDE" }}>
+                  <span className="text-lg flex-shrink-0">{g.icon || "🐷"}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium truncate" style={{ color: "#1F2A24" }}>{g.name}</div>
+                    <div className="text-[10px]" style={{ color: "#9C9280" }}>{formatDateDisplay(g.deadline)}</div>
+                  </div>
+                  <div className="text-xs font-semibold mono flex-shrink-0" style={{ color: isWithdraw ? "#B5443C" : "#3F7D5C" }}>
+                    {isWithdraw ? "-" : "+"}{fmt(Math.abs(g.currentAmount), "USD")}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recent entries */}
       <div className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
@@ -941,63 +958,65 @@ function AccountsPage({ lang, t, users, onAdd, onEdit, onDeleteRequest }) {
 }
 
 /* =========================================================================
-   SAVINGS PAGE — multiple savings goals with progress tracking
+   SAVINGS PAGE — simple savings transaction log (deposit / withdraw)
    ========================================================================= */
-function SavingsPage({ lang, t, savings, onAdd, onEdit, onDeleteRequest, onAdjust }) {
+function SavingsPage({ lang, t, savings, onAdd, onEdit, onDeleteRequest }) {
+  const total = useMemo(() => (savings || []).reduce((sum, g) => sum + Number(g.currentAmount || 0), 0), [savings]);
+
+  const grouped = useMemo(() => {
+    const map = new Map();
+    (savings || []).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).forEach((g) => {
+      const d = g.deadline || new Date(g.createdAt || Date.now()).toISOString().slice(0, 10);
+      if (!map.has(d)) map.set(d, []);
+      map.get(d).push(g);
+    });
+    return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  }, [savings]);
+
   return (
     <div className="space-y-4 pb-20">
-      <div className="flex items-center">
-        <button onClick={onAdd} className="ml-auto px-4 py-2 rounded-xl text-xs font-semibold text-white active:scale-95 transition" style={{ background: "#1B4B43" }}>
+      <div className="rounded-2xl p-4 flex items-center justify-between" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
+        <div>
+          <div className="text-xs mb-1" style={{ color: "#9C9280" }}>{t("totalSavings")}</div>
+          <div className="text-xl font-bold mono" style={{ color: "#1B4B43" }}>{fmt(total, "USD")}</div>
+        </div>
+        <button onClick={onAdd} className="px-4 py-2 rounded-xl text-xs font-semibold text-white active:scale-95 transition" style={{ background: "#1B4B43" }}>
           + {t("newSavingsGoal")}
         </button>
       </div>
 
-      {savings.length === 0 ? (
+      {(!savings || savings.length === 0) ? (
         <div className="text-center py-16">
           <div className="text-3xl mb-2">🐷</div>
           <p className="text-sm font-medium" style={{ color: "#5B5344" }}>{t("noSavingsGoals")}</p>
           <p className="text-xs mt-1" style={{ color: "#9C9280" }}>{t("noSavingsGoalsSub")}</p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
-          {savings.map((g) => {
-            const pct = g.targetAmount > 0 ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
-            const reached = g.currentAmount >= g.targetAmount;
-            return (
-              <div key={g.id} className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 text-xl" style={{ background: "#F3D67333" }}>{g.icon || "🐷"}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold truncate" style={{ color: "#1F2A24" }}>{g.name}</div>
-                    {g.deadline && <div className="text-[10px]" style={{ color: "#9C9280" }}>{formatDateDisplay(g.deadline)}</div>}
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button onClick={() => onEdit(g)} className="w-7 h-7 rounded-full flex items-center justify-center text-xs" style={{ background: "#EFEAE0" }}>✎</button>
-                    <button onClick={() => onDeleteRequest(g.id)} className="w-7 h-7 rounded-full flex items-center justify-center text-xs" style={{ background: "#FBEAE8" }}>🗑</button>
-                  </div>
-                </div>
-
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <span className="text-sm font-bold mono" style={{ color: "#1B4B43" }}>{fmt(g.currentAmount, "USD")}</span>
-                  <span className="text-xs mono" style={{ color: "#9C9280" }}>/ {fmt(g.targetAmount, "USD")}</span>
-                </div>
-                <div className="w-full h-2.5 rounded-full overflow-hidden mb-2" style={{ background: "#EFEAE0" }}>
-                  <div className="h-full rounded-full transition-all" style={{ width: pct + "%", background: reached ? "#3F7D5C" : "#C89B3C" }} />
-                </div>
-                <p className="text-[10px] mb-3" style={{ color: reached ? "#3F7D5C" : "#9C9280" }}>
-                  {reached ? t("goalReached") : `${fmt(g.targetAmount - g.currentAmount, "USD")} ${t("remaining")}`}
-                </p>
-
-                <div className="flex gap-2">
-                  <button onClick={() => onAdjust({ ...g, mode: "add" })}
-                    className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: "#EAF3ED", color: "#3F7D5C" }}>+ {t("addMoney")}</button>
-                  <button onClick={() => onAdjust({ ...g, mode: "withdraw" })}
-                    className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: "#FBEAE8", color: "#B5443C" }}>- {t("withdraw")}</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        grouped.map(([date, items]) => (
+          <div key={date}>
+            <div className="text-[11px] font-semibold mb-1.5 mono" style={{ color: "#9C9280" }}>{formatDateDisplay(date)}</div>
+            <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
+              {items.map((g, idx) => {
+                const isWithdraw = Number(g.currentAmount) < 0;
+                return (
+                  <button key={g.id} onClick={() => onEdit(g)} className="w-full flex items-center gap-3 px-3 py-3 text-left active:bg-[#FAF7F0] transition"
+                    style={{ borderTop: idx === 0 ? "none" : "1px solid #F3EEDE" }}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-base" style={{ background: "#F3D67333" }}>{g.icon || "🐷"}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate" style={{ color: "#1F2A24" }}>{g.name}</div>
+                      <div className="text-[10px] truncate" style={{ color: "#9C9280" }}>{g.createdByName || ""}</div>
+                    </div>
+                    <div className="text-sm font-semibold mono flex-shrink-0" style={{ color: isWithdraw ? "#B5443C" : "#3F7D5C" }}>
+                      {isWithdraw ? "-" : "+"}{fmt(Math.abs(g.currentAmount), "USD")}
+                    </div>
+                    <span onClick={(e) => { e.stopPropagation(); onDeleteRequest(g.id); }}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs flex-shrink-0" style={{ background: "#FBEAE8" }}>🗑</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))
       )}
     </div>
   );
@@ -1006,16 +1025,16 @@ function SavingsPage({ lang, t, savings, onAdd, onEdit, onDeleteRequest, onAdjus
 function SavingsGoalForm({ lang, t, initial, onSave, onClose, onDelete }) {
   const [name, setName] = useState(initial?.name || "");
   const [icon, setIcon] = useState(initial?.icon || "🐷");
-  const [targetAmount, setTargetAmount] = useState(initial?.targetAmount ? String(initial.targetAmount) : "");
-  const [currentAmount, setCurrentAmount] = useState(initial?.currentAmount ? String(initial.currentAmount) : "0");
-  const [deadline, setDeadline] = useState(initial?.deadline || "");
+  const [txType, setTxType] = useState(initial && Number(initial.currentAmount) < 0 ? "withdraw" : "deposit");
+  const [amount, setAmount] = useState(initial?.currentAmount ? String(Math.abs(initial.currentAmount)) : "");
+  const [date, setDate] = useState(initial?.deadline || todayISO());
   const [error, setError] = useState("");
 
   function submit() {
-    const target = Number(targetAmount);
-    const current = Number(currentAmount) || 0;
-    if (!name.trim() || !targetAmount || isNaN(target) || target <= 0) { setError(t("amountRequired")); return; }
-    onSave({ name: name.trim(), icon, targetAmount: target, currentAmount: current, deadline });
+    const num = Number(amount);
+    if (!name.trim() || !amount || isNaN(num) || num <= 0) { setError(t("amountRequired")); return; }
+    const signed = txType === "withdraw" ? -num : num;
+    onSave({ name: name.trim(), icon, targetAmount: 0, currentAmount: signed, deadline: date });
   }
 
   return (
@@ -1027,6 +1046,11 @@ function SavingsGoalForm({ lang, t, initial, onSave, onClose, onDelete }) {
           <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-sm" style={{ background: "#F0ECE0", color: "#5B5344" }}>✕</button>
         </div>
         <div className="px-5 pb-8 space-y-4">
+          <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid #E8E0CE" }}>
+            <button type="button" onClick={() => setTxType("deposit")} className="flex-1 py-2.5 text-sm font-semibold" style={{ background: txType === "deposit" ? "#3F7D5C" : "#FFFFFF", color: txType === "deposit" ? "#fff" : "#5B5344" }}>{t("savingsDeposit")}</button>
+            <button type="button" onClick={() => setTxType("withdraw")} className="flex-1 py-2.5 text-sm font-semibold" style={{ background: txType === "withdraw" ? "#B5443C" : "#FFFFFF", color: txType === "withdraw" ? "#fff" : "#5B5344" }}>{t("withdraw")}</button>
+          </div>
+
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("chooseIcon")}</label>
             <div className="grid grid-cols-8 gap-1.5 max-h-32 overflow-y-auto">
@@ -1042,31 +1066,21 @@ function SavingsGoalForm({ lang, t, initial, onSave, onClose, onDelete }) {
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("goalName")}</label>
             <input type="text" value={name} onChange={(e) => { setName(e.target.value); setError(""); }}
+              placeholder={lang === "kh" ? "ឧ. សន្សំទិញផ្ទះ" : "e.g. House fund"}
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("targetAmount")}</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("amount")}</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: "#9C9280" }}>$</span>
-              <input type="number" inputMode="decimal" value={targetAmount} onChange={(e) => { setTargetAmount(e.target.value); setError(""); }}
+              <input type="number" inputMode="decimal" value={amount} onChange={(e) => { setAmount(e.target.value); setError(""); }}
                 placeholder="0.00" className="w-full pl-7 pr-3 py-2.5 rounded-xl text-sm outline-none mono"
                 style={{ background: "#FFFFFF", border: "1px solid " + (error ? "#B5443C" : "#E8E0CE"), color: "#1F2A24" }} />
             </div>
           </div>
-          {!initial && (
-            <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("currentAmount")}</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: "#9C9280" }}>$</span>
-                <input type="number" inputMode="decimal" value={currentAmount} onChange={(e) => setCurrentAmount(e.target.value)}
-                  placeholder="0.00" className="w-full pl-7 pr-3 py-2.5 rounded-xl text-sm outline-none mono"
-                  style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
-              </div>
-            </div>
-          )}
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("deadline")}</label>
-            <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)}
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("date")}</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
           </div>
           {error && <p className="text-xs" style={{ color: "#B5443C" }}>{error}</p>}
@@ -1078,40 +1092,6 @@ function SavingsGoalForm({ lang, t, initial, onSave, onClose, onDelete }) {
               {t("save")}
             </button>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdjustGoalModal({ lang, t, goal, onSave, onClose }) {
-  const isAdd = goal.mode === "add";
-  const [amount, setAmount] = useState("");
-  const [error, setError] = useState("");
-
-  function submit() {
-    const num = Number(amount);
-    if (!amount || isNaN(num) || num <= 0) { setError(t("amountRequired")); return; }
-    const next = isAdd ? goal.currentAmount + num : Math.max(0, goal.currentAmount - num);
-    onSave(next);
-  }
-
-  return (
-    <div className="fixed inset-0 z-[55] flex items-center justify-center fade-anim px-6">
-      <div className="absolute inset-0" style={{ background: "rgba(27,42,36,0.55)" }} onClick={onClose} />
-      <div className="relative w-full max-w-xs rounded-2xl p-5" style={{ background: "#FAF7F0" }}>
-        <h3 className="text-sm font-semibold mb-1" style={{ color: "#1F2A24" }}>{goal.icon} {goal.name}</h3>
-        <p className="text-xs mb-4" style={{ color: "#9C9280" }}>{isAdd ? t("amountToAdd") : t("amountToWithdraw")}</p>
-        <div className="relative mb-3">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: "#9C9280" }}>$</span>
-          <input type="number" inputMode="decimal" autoFocus value={amount} onChange={(e) => { setAmount(e.target.value); setError(""); }}
-            placeholder="0.00" className="w-full pl-7 pr-3 py-2.5 rounded-xl text-sm outline-none mono"
-            style={{ background: "#FFFFFF", border: "1px solid " + (error ? "#B5443C" : "#E8E0CE"), color: "#1F2A24" }} />
-        </div>
-        {error && <p className="text-xs mb-3" style={{ color: "#B5443C" }}>{error}</p>}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-medium" style={{ background: "#F0ECE0", color: "#5B5344" }}>{t("cancel")}</button>
-          <button onClick={submit} className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white" style={{ background: isAdd ? "#3F7D5C" : "#B5443C" }}>{t("save")}</button>
         </div>
       </div>
     </div>
@@ -1135,7 +1115,7 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
   const [newCatIcon, setNewCatIcon] = useState("");
   const [newCatName, setNewCatName] = useState("");
   const [linkSavings, setLinkSavings] = useState(false);
-  const [savingsGoalId, setSavingsGoalId] = useState(savings && savings[0] ? savings[0].id : "");
+  const [savingsLabel, setSavingsLabel] = useState("");
 
   function openAddCategoryPanel() {
     setEditingCategoryId(null);
@@ -1166,9 +1146,10 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
   function submit() {
     const num = Number(amount);
     if (!amount || isNaN(num) || num <= 0) { setError(t("amountRequired")); return; }
+    if (linkSavings && !savingsLabel.trim()) { setError(t("fieldsRequired")); return; }
     onSave({
       type, amount: num, currency, category, date, member: member.trim(), note: note.trim(),
-      linkedSavingsGoalId: (type === "expense" && linkSavings && savingsGoalId) ? savingsGoalId : null,
+      savingsLabel: (linkSavings && savingsLabel.trim()) ? savingsLabel.trim() : null,
     });
   }
 
@@ -1246,7 +1227,7 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
             )}
           </div>
 
-          {type === "expense" && savings && savings.length > 0 && (
+          {type === "expense" && (
             <div className="p-3 rounded-xl" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE" }}>
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input type="checkbox" checked={linkSavings} onChange={(e) => setLinkSavings(e.target.checked)}
@@ -1254,10 +1235,9 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
                 <span className="text-xs font-medium" style={{ color: "#1F2A24" }}>🐷 {t("linkToSavings")}</span>
               </label>
               {linkSavings && (
-                <select value={savingsGoalId} onChange={(e) => setSavingsGoalId(e.target.value)}
-                  className="w-full mt-2.5 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "#FAF7F0", border: "1px solid #E8E0CE", color: "#1F2A24" }}>
-                  {savings.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
-                </select>
+                <input type="text" value={savingsLabel} onChange={(e) => setSavingsLabel(e.target.value)}
+                  placeholder={t("savingsLabel")}
+                  className="w-full mt-2.5 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "#FAF7F0", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
               )}
             </div>
           )}
