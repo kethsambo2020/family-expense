@@ -430,7 +430,7 @@ function App() {
         }),
       });
     }
-    if (savingsLabel && !editingTx) {
+    if (savingsLabel) {
       const cat = allCategories.find((c) => c.id === entryData.category);
       await fetch(API_BASE + "/savings", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1122,7 +1122,10 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
   // Auto-detect: if the chosen category looks like a "savings" category
   // (name contains "saving" or "សន្សំ"), automatically also log this amount
   // into the Savings page, using the note (or category name) as the label.
+  // Only auto-checks for brand-new entries — when editing, the person must
+  // tick it manually so we don't silently create duplicate savings records.
   useEffect(() => {
+    if (initial) return;
     const cat = allCategories.find((c) => c.id === category);
     if (!cat) return;
     const nameMatch = (cat.en + " " + cat.kh).toLowerCase().includes("saving") || cat.kh.includes("សន្សំ");
@@ -1254,11 +1257,18 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
             )}
           </div>
 
-          {type === "expense" && !initial && (
+          {type === "expense" && (
             <div className="p-3 rounded-xl" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE" }}>
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input type="checkbox" checked={linkSavings}
-                  onChange={(e) => { setLinkSavings(e.target.checked); setAutoDetected(false); }}
+                  onChange={(e) => {
+                    setLinkSavings(e.target.checked);
+                    setAutoDetected(false);
+                    if (e.target.checked && !savingsLabel.trim()) {
+                      const cat = allCategories.find((c) => c.id === category);
+                      setSavingsLabel(note.trim() || (cat ? (lang === "kh" ? cat.kh : cat.en) : ""));
+                    }
+                  }}
                   className="w-4 h-4 flex-shrink-0" />
                 <span className="text-xs font-medium" style={{ color: "#1F2A24" }}>🐷 {t("linkToSavings")}</span>
                 {autoDetected && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "#EAF3ED", color: "#3F7D5C" }}>{t("autoDetected")}</span>}
