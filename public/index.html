@@ -143,6 +143,7 @@ const T = {
   linkToSavings: { en: "Also record this as savings", kh: "កត់ត្រាចំនួននេះទុកជាការសន្សំផងដែរ" },
   savingsLabel: { en: "Savings label (optional)", kh: "ឈ្មោះការសន្សំ (មិនចាំបាច់)" },
   autoDetected: { en: "auto-detected", kh: "ស្គាល់ស្វ័យប្រវត្តិ" },
+  linkTransfer: { en: "Also record into another member's account", kh: "កត់ត្រាចូលគណនីសមាជិកម្នាក់ទៀតផងដែរ" },
   filterMonth: { en: "Month", kh: "ខែ" },
   filterYear: { en: "Year", kh: "ឆ្នាំ" },
   filterMember: { en: "Member", kh: "សមាជិក" },
@@ -415,7 +416,7 @@ function App() {
   function openAdd() { setEditingTx(null); setShowForm(true); }
   function openEdit(tx) { setEditingTx(tx); setShowForm(true); }
   async function handleSave(data) {
-    const { savingsLabel, ...entryData } = data;
+    const { savingsLabel, transferToUserId, ...entryData } = data;
     if (editingTx) {
       await fetch(API_BASE + "/entries/" + editingTx.id, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(entryData),
@@ -441,6 +442,22 @@ function App() {
         }),
       });
       await refetchSavings();
+    }
+    if (transferToUserId) {
+      const targetUser = users.find((u) => u.id === transferToUserId);
+      if (targetUser) {
+        const mirrorType = entryData.type === "expense" ? "income" : "expense";
+        const noteText = (lang === "kh" ? "ផ្ទេរពី " : "Transfer from ") + (currentUser ? currentUser.name : "");
+        await fetch(API_BASE + "/entries", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: mirrorType, amount: entryData.amount, currency: entryData.currency,
+            category: entryData.category, date: entryData.date, member: currentUser ? currentUser.name : "",
+            note: entryData.note ? entryData.note + " (" + noteText + ")" : noteText,
+            createdByName: targetUser.name, createdByUserId: targetUser.id,
+          }),
+        });
+      }
     }
     await refetchEntries();
     setShowForm(false); setEditingTx(null);
@@ -511,7 +528,7 @@ function App() {
       </div>
 
       {showForm && (
-        <EntryForm lang={lang} t={t} initial={editingTx} allCategories={allCategories} savings={savings}
+        <EntryForm lang={lang} t={t} initial={editingTx} allCategories={allCategories} savings={savings} users={users}
           currentUser={currentUser} onAddCategory={handleAddCategory} onEditCategory={handleEditCategory}
           onSave={handleSave} onClose={() => { setShowForm(false); setEditingTx(null); }}
           onDelete={editingTx ? () => setConfirmDeleteId(editingTx.id) : null} />
@@ -1102,7 +1119,7 @@ function SavingsGoalForm({ lang, t, initial, onSave, onClose, onDelete }) {
 /* =========================================================================
    ENTRY FORM (sheet)
    ========================================================================= */
-function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAddCategory, onEditCategory, onSave, onClose, onDelete }) {
+function EntryForm({ lang, t, initial, allCategories, currentUser, savings, users, onAddCategory, onEditCategory, onSave, onClose, onDelete }) {
   const [type, setType] = useState(initial?.type || "expense");
   const [amount, setAmount] = useState(initial?.amount ? String(initial.amount) : "");
   const [currency, setCurrency] = useState(initial?.currency || "USD");
@@ -1118,6 +1135,9 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
   const [linkSavings, setLinkSavings] = useState(false);
   const [savingsLabel, setSavingsLabel] = useState("");
   const [autoDetected, setAutoDetected] = useState(false);
+  const [linkTransfer, setLinkTransfer] = useState(false);
+  const [transferUserId, setTransferUserId] = useState("");
+  const otherUsers = (users || []).filter((u) => !currentUser || u.id !== currentUser.id);
 
   // Auto-detect: if the chosen category looks like a "savings" category
   // (name contains "saving" or "សន្សំ"), automatically also log this amount
@@ -1177,9 +1197,11 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
     const num = Number(amount);
     if (!amount || isNaN(num) || num <= 0) { setError(t("amountRequired")); return; }
     if (linkSavings && !savingsLabel.trim()) { setError(t("fieldsRequired")); return; }
+    if (linkTransfer && !transferUserId) { setError(t("fieldsRequired")); return; }
     onSave({
       type, amount: num, currency, category, date, member: member.trim(), note: note.trim(),
       savingsLabel: (linkSavings && savingsLabel.trim()) ? savingsLabel.trim() : null,
+      transferToUserId: (linkTransfer && transferUserId) ? transferUserId : null,
     });
   }
 
@@ -1277,6 +1299,23 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, onAd
                 <input type="text" value={savingsLabel} onChange={(e) => { setSavingsLabel(e.target.value); setAutoDetected(false); }}
                   placeholder={t("savingsLabel")}
                   className="w-full mt-2.5 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "#FAF7F0", border: "1px solid #E8E0CE", color: "#1F2A24" }} />
+              )}
+            </div>
+          )}
+
+          {otherUsers.length > 0 && (
+            <div className="p-3 rounded-xl" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE" }}>
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={linkTransfer}
+                  onChange={(e) => { setLinkTransfer(e.target.checked); if (e.target.checked && !transferUserId) setTransferUserId(otherUsers[0].id); }}
+                  className="w-4 h-4 flex-shrink-0" />
+                <span className="text-xs font-medium" style={{ color: "#1F2A24" }}>🔁 {t("linkTransfer")}</span>
+              </label>
+              {linkTransfer && (
+                <select value={transferUserId} onChange={(e) => setTransferUserId(e.target.value)}
+                  className="w-full mt-2.5 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "#FAF7F0", border: "1px solid #E8E0CE", color: "#1F2A24" }}>
+                  {otherUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
               )}
             </div>
           )}
