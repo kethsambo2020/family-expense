@@ -658,9 +658,19 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
     return { income, expense };
   }, [visibleEntries]);
 
+  const visibleSavings = useMemo(() => {
+    return (savings || []).filter((g) => {
+      const d = new Date(g.deadline || g.createdAt || Date.now());
+      const okYear = filterYear === "all" || d.getFullYear() === filterYear;
+      const okMonth = filterMonth === "all" || d.getMonth() === filterMonth;
+      const okUser = filterUser === "all" || g.createdByUserId === filterUser;
+      return okYear && okMonth && okUser;
+    });
+  }, [savings, filterMonth, filterYear, filterUser]);
+
   const totalSaved = useMemo(() => {
-    return (savings || []).reduce((sum, g) => sum + Number(g.currentAmount || 0), 0);
-  }, [savings]);
+    return visibleSavings.reduce((sum, g) => sum + Number(g.currentAmount || 0), 0);
+  }, [visibleSavings]);
 
   const barData = useMemo(() => {
     const year = filterYear === "all" ? new Date().getFullYear() : filterYear;
@@ -803,23 +813,27 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
             <h3 className="text-xs font-semibold" style={{ color: "#5B5344" }}>🐷 {t("savingsGoals")}</h3>
             <button onClick={() => setPage("savings")} className="text-[10px] font-semibold" style={{ color: "#1B4B43" }}>{t("viewAll")} →</button>
           </div>
-          <div className="space-y-1">
-            {savings.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5).map((g) => {
-              const isWithdraw = Number(g.currentAmount) < 0;
-              return (
-                <div key={g.id} className="flex items-center gap-3 py-2" style={{ borderTop: "1px solid #F3EEDE" }}>
-                  <span className="text-lg flex-shrink-0">{g.icon || "🐷"}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium truncate" style={{ color: "#1F2A24" }}>{g.name}</div>
-                    <div className="text-[10px]" style={{ color: "#9C9280" }}>{formatDateDisplay(g.deadline)}</div>
+          {visibleSavings.length === 0 ? (
+            <p className="text-xs text-center py-4" style={{ color: "#9C9280" }}>{t("noEntries")}</p>
+          ) : (
+            <div className="space-y-1">
+              {visibleSavings.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5).map((g) => {
+                const isWithdraw = Number(g.currentAmount) < 0;
+                return (
+                  <div key={g.id} className="flex items-center gap-3 py-2" style={{ borderTop: "1px solid #F3EEDE" }}>
+                    <span className="text-lg flex-shrink-0">{g.icon || "🐷"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium truncate" style={{ color: "#1F2A24" }}>{g.name}</div>
+                      <div className="text-[10px]" style={{ color: "#9C9280" }}>{formatDateDisplay(g.deadline)}</div>
+                    </div>
+                    <div className="text-xs font-semibold mono flex-shrink-0" style={{ color: isWithdraw ? "#B5443C" : "#3F7D5C" }}>
+                      {isWithdraw ? "-" : "+"}{fmt(Math.abs(g.currentAmount), "USD")}
+                    </div>
                   </div>
-                  <div className="text-xs font-semibold mono flex-shrink-0" style={{ color: isWithdraw ? "#B5443C" : "#3F7D5C" }}>
-                    {isWithdraw ? "-" : "+"}{fmt(Math.abs(g.currentAmount), "USD")}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
