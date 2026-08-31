@@ -52,20 +52,79 @@ const ICON_PALETTE = [
 ];
 
 const CATEGORIES = [
-  { id: "food", icon: "🍜", en: "Food", kh: "ម្ហូបអាហារ", color: "#B5443C" },
-  { id: "transport", icon: "🚌", en: "Transport", kh: "ធ្វើដំណើរ", color: "#8B5E34" },
-  { id: "utilities", icon: "⚡", en: "Utilities", kh: "ទឹក-អគ្គិសនី", color: "#C89B3C" },
-  { id: "rent", icon: "🏠", en: "Rent / Housing", kh: "ជួល-លំនៅដ្ឋាន", color: "#6B4E9B" },
-  { id: "health", icon: "⚕️", en: "Health", kh: "សុខភាព", color: "#C14B6B" },
-  { id: "education", icon: "🎓", en: "Education", kh: "អប់រំ", color: "#2E6B8A" },
-  { id: "salary", icon: "💵", en: "Salary", kh: "ប្រាក់ខែ", color: "#3F7D5C" },
-  { id: "business", icon: "💼", en: "Business", kh: "អាជីវកម្ម", color: "#2F6B4F" },
-  { id: "bank", icon: "🏦", en: "Bank / Loan", kh: "បង់ធនាគារ", color: "#4A5C8A" },
-  { id: "shopping", icon: "🛍️", en: "Market / Shopping", kh: "ដើរផ្សារ", color: "#B0793C" },
-  { id: "clothing", icon: "👕", en: "Clothing", kh: "សម្លៀកបំពាក់", color: "#7A5C99" },
-  { id: "children", icon: "🧒", en: "Children", kh: "ចំណាយសម្រាប់កូន", color: "#3C8A78" },
-  { id: "other", icon: "•••", en: "Other", kh: "ផ្សេងៗ", color: "#5B6B63" },
+  // ── Income ──
+  { id: "salary", icon: "💵", en: "Salary", kh: "ប្រាក់ខែ", color: "#3F7D5C", group: "income" },
+  { id: "business", icon: "💼", en: "Business income", kh: "ចំណូលអាជីវកម្ម", color: "#2F6B4F", group: "income" },
+  { id: "other_income", icon: "💰", en: "Other income", kh: "ចំណូលផ្សេងៗ", color: "#3F7D5C", group: "income" },
+
+  // ── Saving ──
+  { id: "sinking_fund", icon: "📈", en: "Sinking fund", kh: "ទីវាការសម្រាប់ចំណាយ", color: "#C89B3C", group: "saving" },
+  { id: "saving_capitalize", icon: "🏦", en: "Saving for capitalize", kh: "ប្រាក់សន្សំសុទ្ធ", color: "#C89B3C", group: "saving" },
+
+  // ── Expense > Entertainment ──
+  { id: "food_outside", icon: "🍔", en: "Food outside", kh: "ម្ហូបអាហារខាងក្រៅ", color: "#B5443C", group: "expense", sub: "entertainment" },
+  { id: "transport", icon: "🚌", en: "Outing", kh: "ដំណើរកំសាន្ត", color: "#8B5E34", group: "expense", sub: "entertainment" },
+  { id: "shopping", icon: "🛍️", en: "Shopping", kh: "ដើរផ្សារ", color: "#B0793C", group: "expense", sub: "entertainment" },
+  { id: "clothing", icon: "👕", en: "Clothing", kh: "សម្លៀកបំពាក់", color: "#7A5C99", group: "expense", sub: "entertainment" },
+  { id: "pet", icon: "🐾", en: "Pet", kh: "សត្វចិញ្ចឹម", color: "#8B5E34", group: "expense", sub: "entertainment" },
+  { id: "games", icon: "🎮", en: "Games", kh: "ហ្គេម", color: "#6B4E9B", group: "expense", sub: "entertainment" },
+  { id: "coffee", icon: "☕", en: "Coffee", kh: "កាហ្វេ", color: "#8B5E34", group: "expense", sub: "entertainment" },
+
+  // ── Expense > Liability ──
+  { id: "bank", icon: "🏦", en: "Bank / Loan", kh: "បង់ធនាគារ", color: "#4A5C8A", group: "expense", sub: "liability" },
+
+  // ── Expense > Household ──
+  { id: "food", icon: "🍜", en: "Daily food", kh: "ម្ហូបអាហារប្រចាំថ្ងៃ", color: "#B5443C", group: "expense", sub: "household" },
+  { id: "utilities", icon: "⚡", en: "Utilities", kh: "ទឹកភ្លើង", color: "#C89B3C", group: "expense", sub: "household" },
+  { id: "internet", icon: "📶", en: "Internet", kh: "អុីនធឺណេត", color: "#2E6B8A", group: "expense", sub: "household" },
+  { id: "household_items", icon: "🧺", en: "Household items", kh: "សម្ភារៈប្រើប្រាស់ក្នុងផ្ទះ", color: "#6B4E9B", group: "expense", sub: "household" },
+  { id: "rent", icon: "🏠", en: "Rent / Housing", kh: "ជួល-លំនៅដ្ឋាន", color: "#6B4E9B", group: "expense", sub: "household" },
+
+  // ── Expense > Vehicle ──
+  { id: "fuel", icon: "⛽", en: "Fuel", kh: "សាំង", color: "#8B5E34", group: "expense", sub: "vehicle" },
+
+  // ── Expense > Health ──
+  { id: "health", icon: "⚕️", en: "Health", kh: "ថ្នាំ/ពេទ្យជំងឺ", color: "#C14B6B", group: "expense", sub: "health" },
+
+  // ── Expense > Kid expense ──
+  { id: "education", icon: "🎓", en: "Education", kh: "អប់រំ/ការសិក្សា", color: "#2E6B8A", group: "expense", sub: "kid" },
+  { id: "children", icon: "🍼", en: "Kid food", kh: "ថ្លៃអាហារកូន", color: "#3C8A78", group: "expense", sub: "kid" },
+
+  // ── Other (fallback) ──
+  { id: "other", icon: "•••", en: "Other", kh: "ផ្សេងៗ", color: "#5B6B63", group: "expense", sub: "entertainment" },
 ];
+
+// Sub-category tabs shown when recording an expense (Saving is included here
+// since saving money is also money leaving day-to-day spending).
+const EXPENSE_SUBGROUPS = [
+  { id: "saving", icon: "🐷", en: "Saving", kh: "សន្សំ" },
+  { id: "entertainment", icon: "🎉", en: "Entertainment", kh: "ការកំសាន្ត" },
+  { id: "liability", icon: "💳", en: "Liability", kh: "បំណុល" },
+  { id: "household", icon: "🏠", en: "Household", kh: "ចំណាយប្រើប្រាស់ក្នុងផ្ទះ" },
+  { id: "vehicle", icon: "🚗", en: "Vehicle", kh: "យានយន្ត" },
+  { id: "health", icon: "⚕️", en: "Health", kh: "សុខភាព" },
+  { id: "kid", icon: "🧒", en: "Kid expense", kh: "ចំណាយសម្រាប់កូន" },
+];
+
+// Determines which tab (income / saving / expense-sub) a category belongs to.
+// New categories carry an explicit `group`/`sub`. Custom categories created
+// going forward embed their tab in the id ("custom_<tabId>_..."); older
+// custom categories (created before this feature) fall back to a simple
+// name match so a category literally called "Saving ..." still lands under
+// the Saving tab instead of Entertainment.
+function categoryTabId(cat) {
+  if (!cat) return "entertainment";
+  if (cat.group === "income") return "income";
+  if (cat.group === "saving") return "saving";
+  if (cat.group === "expense") return cat.sub || "entertainment";
+  if (cat.id && cat.id.startsWith("custom_")) {
+    const parts = cat.id.split("_");
+    const knownTabs = ["income", "saving", "entertainment", "liability", "household", "vehicle", "health", "kid"];
+    if (parts.length >= 3 && knownTabs.includes(parts[1])) return parts[1];
+  }
+  const nameMatch = ((cat.en || "") + " " + (cat.kh || "")).toLowerCase().includes("saving") || (cat.kh || "").includes("សន្សំ");
+  return nameMatch ? "saving" : "entertainment";
+}
 
 const MONTHS = [
   { en: "January", kh: "មករា" }, { en: "February", kh: "កុម្ភៈ" },
@@ -1137,7 +1196,17 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, user
   const [type, setType] = useState(initial?.type || "expense");
   const [amount, setAmount] = useState(initial?.amount ? String(initial.amount) : "");
   const [currency, setCurrency] = useState(initial?.currency || "USD");
-  const [category, setCategory] = useState(initial?.category || allCategories[0].id);
+  const [activeGroup, setActiveGroup] = useState(() => {
+    const initialCat = initial ? allCategories.find((c) => c.id === initial.category) : null;
+    const tab = initialCat ? categoryTabId(initialCat) : "entertainment";
+    return tab === "income" ? "entertainment" : tab;
+  });
+  const [category, setCategory] = useState(() => {
+    if (initial?.category) return initial.category;
+    const tabId = (initial?.type || "expense") === "income" ? "income" : activeGroup;
+    const list = allCategories.filter((c) => categoryTabId(c) === tabId);
+    return list[0] ? list[0].id : allCategories[0].id;
+  });
   const [date, setDate] = useState(initial?.date || todayISO());
   const [member, setMember] = useState(initial?.member || "");
   const [note, setNote] = useState(initial?.note || "");
@@ -1153,17 +1222,28 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, user
   const [transferUserId, setTransferUserId] = useState("");
   const otherUsers = (users || []).filter((u) => !currentUser || u.id !== currentUser.id);
 
-  // Auto-detect: if the chosen category looks like a "savings" category
-  // (name contains "saving" or "សន្សំ"), automatically also log this amount
-  // into the Savings page, using the note (or category name) as the label.
-  // Only auto-checks for brand-new entries — when editing, the person must
-  // tick it manually so we don't silently create duplicate savings records.
+  // Keep the selected category valid whenever the type (income/expense) or
+  // the active sub-category tab changes — jump to the first item in the
+  // newly active list if the current selection no longer belongs there.
+  useEffect(() => {
+    const tabId = type === "income" ? "income" : activeGroup;
+    const list = allCategories.filter((c) => categoryTabId(c) === tabId);
+    if (!list.find((c) => c.id === category)) {
+      setCategory(list[0] ? list[0].id : allCategories[0].id);
+    }
+  }, [type, activeGroup]);
+
+  // Auto-detect: if the chosen category is in the "Saving" tab, automatically
+  // also log this amount into the Savings page, using the note (or category
+  // name) as the label. Only auto-checks for brand-new entries — when
+  // editing, the person must tick it manually so we don't silently create
+  // duplicate savings records.
   useEffect(() => {
     if (initial) return;
     const cat = allCategories.find((c) => c.id === category);
     if (!cat) return;
-    const nameMatch = (cat.en + " " + cat.kh).toLowerCase().includes("saving") || cat.kh.includes("សន្សំ");
-    if (nameMatch) {
+    const isSavingCategory = categoryTabId(cat) === "saving";
+    if (isSavingCategory) {
       setLinkSavings(true);
       setAutoDetected(true);
       setSavingsLabel(note.trim() || (lang === "kh" ? cat.kh : cat.en));
@@ -1200,7 +1280,8 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, user
     if (editingCategoryId) {
       onEditCategory(editingCategoryId, { icon: newCatIcon || "🏷️", en: newCatName.trim(), kh: newCatName.trim() });
     } else {
-      const id = "custom_" + Date.now().toString(36);
+      const tabId = type === "income" ? "income" : activeGroup;
+      const id = "custom_" + tabId + "_" + Date.now().toString(36);
       onAddCategory({ id, icon: newCatIcon || "🏷️", en: newCatName.trim(), kh: newCatName.trim(), color: "#7A6A4A" });
       setCategory(id);
     }
@@ -1246,8 +1327,19 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, user
 
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("category")}</label>
+            {type === "expense" && (
+              <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1 -mx-0.5 px-0.5">
+                {EXPENSE_SUBGROUPS.map((g) => (
+                  <button key={g.id} onClick={() => setActiveGroup(g.id)} type="button"
+                    className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition"
+                    style={{ background: activeGroup === g.id ? "#1B4B43" : "#FFFFFF", color: activeGroup === g.id ? "#fff" : "#5B5344", border: "1px solid " + (activeGroup === g.id ? "#1B4B43" : "#E8E0CE") }}>
+                    {g.icon} {lang === "kh" ? g.kh : g.en}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="grid grid-cols-4 gap-2">
-              {allCategories.map((cat) => {
+              {allCategories.filter((c) => categoryTabId(c) === (type === "income" ? "income" : activeGroup)).map((cat) => {
                 const isCustom = cat.id.startsWith("custom_");
                 return (
                   <button key={cat.id} onClick={() => setCategory(cat.id)}
