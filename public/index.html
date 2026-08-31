@@ -702,6 +702,7 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
   const pieRef = useRef(null);
   const barChart = useRef(null);
   const pieChart = useRef(null);
+  const [expenseGroupFilter, setExpenseGroupFilter] = useState("all");
 
   const visibleEntries = useMemo(() => {
     return filterUser === "all" ? filtered : filtered.filter((tx) => tx.createdByUserId === filterUser);
@@ -750,13 +751,19 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
     const map = new Map();
     visibleEntries.forEach((tx) => {
       if (tx.currency !== "USD" || tx.type !== "expense") return;
+      if (expenseGroupFilter !== "all") {
+        const cat = allCategories.find((c) => c.id === tx.category);
+        if (!cat || categoryTabId(cat) !== expenseGroupFilter) return;
+      }
       map.set(tx.category, (map.get(tx.category) || 0) + Number(tx.amount));
     });
     return Array.from(map.entries()).map(([catId, val]) => {
       const cat = allCategories.find((c) => c.id === catId);
       return { catId, val, label: cat ? (lang === "kh" ? cat.kh : cat.en) : catId, color: cat ? cat.color : "#999", icon: cat ? cat.icon : "•" };
     }).sort((a, b) => b.val - a.val);
-  }, [visibleEntries, allCategories, lang]);
+  }, [visibleEntries, allCategories, lang, expenseGroupFilter]);
+
+  const pieTotal = useMemo(() => pieData.reduce((sum, p) => sum + p.val, 0), [pieData]);
 
   useEffect(() => {
     if (!barRef.current) return;
@@ -856,7 +863,26 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
           <div style={{ height: 220 }}><canvas ref={barRef}></canvas></div>
         </div>
         <div className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
-          <h3 className="text-xs font-semibold mb-3" style={{ color: "#5B5344" }}>🥧 {t("categoryChart")}</h3>
+          <h3 className="text-xs font-semibold mb-2" style={{ color: "#5B5344" }}>🥧 {t("categoryChart")}</h3>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            <button onClick={() => setExpenseGroupFilter("all")}
+              className="px-2.5 py-1 rounded-full text-[10px] font-medium transition"
+              style={{ background: expenseGroupFilter === "all" ? "#1B4B43" : "#FAF7F0", color: expenseGroupFilter === "all" ? "#fff" : "#5B5344" }}>
+              {t("all")}
+            </button>
+            {EXPENSE_SUBGROUPS.map((g) => (
+              <button key={g.id} onClick={() => setExpenseGroupFilter(g.id)}
+                className="px-2.5 py-1 rounded-full text-[10px] font-medium transition"
+                style={{ background: expenseGroupFilter === g.id ? "#1B4B43" : "#FAF7F0", color: expenseGroupFilter === g.id ? "#fff" : "#5B5344" }}>
+                {g.icon} {lang === "kh" ? g.kh : g.en}
+              </button>
+            ))}
+          </div>
+          {expenseGroupFilter !== "all" && (
+            <p className="text-xs font-bold mono mb-2" style={{ color: "#B5443C" }}>
+              {(EXPENSE_SUBGROUPS.find((g) => g.id === expenseGroupFilter) || {})[lang === "kh" ? "kh" : "en"]}: {fmt(pieTotal, "USD")}
+            </p>
+          )}
           {pieData.length === 0 ? (
             <div className="h-[220px] flex items-center justify-center text-xs text-center px-4" style={{ color: "#9C9280" }}>{t("noChartData")}</div>
           ) : (
@@ -1328,7 +1354,7 @@ function EntryForm({ lang, t, initial, allCategories, currentUser, savings, user
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ color: "#8A7C56" }}>{t("category")}</label>
             {type === "expense" && (
-              <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1 -mx-0.5 px-0.5">
+              <div className="flex flex-wrap gap-1.5 mb-2">
                 {EXPENSE_SUBGROUPS.map((g) => (
                   <button key={g.id} onClick={() => setActiveGroup(g.id)} type="button"
                     className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition"
