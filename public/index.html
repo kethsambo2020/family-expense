@@ -109,9 +109,10 @@ const EXPENSE_SUBGROUPS = [
 // Determines which tab (income / saving / expense-sub) a category belongs to.
 // New categories carry an explicit `group`/`sub`. Custom categories created
 // going forward embed their tab in the id ("custom_<tabId>_..."); older
-// custom categories (created before this feature) fall back to a simple
-// name match so a category literally called "Saving ..." still lands under
-// the Saving tab instead of Entertainment.
+// custom categories (created before this feature) fall back to keyword
+// matching against their name so e.g. "Internet" lands under Household and
+// "ចំណាយសម្រាប់កូន" lands under Kid expense, instead of all bunching under
+// Entertainment.
 function categoryTabId(cat) {
   if (!cat) return "entertainment";
   if (cat.group === "income") return "income";
@@ -122,8 +123,19 @@ function categoryTabId(cat) {
     const knownTabs = ["income", "saving", "entertainment", "liability", "household", "vehicle", "health", "kid"];
     if (parts.length >= 3 && knownTabs.includes(parts[1])) return parts[1];
   }
-  const nameMatch = ((cat.en || "") + " " + (cat.kh || "")).toLowerCase().includes("saving") || (cat.kh || "").includes("សន្សំ");
-  return nameMatch ? "saving" : "entertainment";
+  const text = ((cat.en || "") + " " + (cat.kh || "")).toLowerCase();
+  const rules = [
+    { tab: "saving", keys: ["saving", "សន្សំ"] },
+    { tab: "kid", keys: ["កូន", "កុមារ", "kid", "child", "សិស្ស", "សាលារៀន", "school"] },
+    { tab: "vehicle", keys: ["ឡាន", "car", "សាំង", "fuel", "gas", "ម៉ូតូ", "moto", "vehicle", "រថយន្ត"] },
+    { tab: "health", keys: ["ពេទ្យ", "ថ្នាំ", "health", "doctor", "hospital", "medicine", "សុខភាព"] },
+    { tab: "liability", keys: ["ធនាគារ", "bank", "loan", "បំណុល", "ប្រាក់កម្ចី", "credit", "ត្រូវសង"] },
+    { tab: "household", keys: ["internet", "អុីនធឺណេត", "ទឹក", "ភ្លើង", "ផ្ទះ", "household", "សម្ភារៈ", "ដុសដុល", "ជួល", "rent", "electric", "water", "wifi", "វិហ្វី"] },
+  ];
+  for (const rule of rules) {
+    if (rule.keys.some((k) => text.includes(k))) return rule.tab;
+  }
+  return "entertainment";
 }
 
 const MONTHS = [
