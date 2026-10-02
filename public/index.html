@@ -221,6 +221,7 @@ const T = {
   totalIncome: { en: "Total income", kh: "ចំណូលសរុប" },
   totalExpense: { en: "Total expense", kh: "ចំណាយសរុប" },
   netBalance: { en: "Net balance", kh: "សមតុល្យសុទ្ធ" },
+  carryInNote: { en: "incl. carried over from before:", kh: "រួមទាំងសល់ពីមុន:" },
   totalSavings: { en: "Total savings", kh: "សរុបការសន្សំ" },
   viewAll: { en: "View all", kh: "មើលទាំងអស់" },
   trendChart: { en: "Income vs Expense by month", kh: "និន្នាការចំណូល-ចំណាយតាមខែ" },
@@ -720,6 +721,26 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
     return filterUser === "all" ? filtered : filtered.filter((tx) => tx.createdByUserId === filterUser);
   }, [filtered, filterUser]);
 
+  // Balance carried forward: when a specific month+year is selected, any
+  // leftover positive balance (income - expense) from everything *before*
+  // that month rolls forward and counts as income for the selected period —
+  // per member when a member filter is active, or for the whole family
+  // when "all" is selected.
+  const carryIn = useMemo(() => {
+    if (filterMonth === "all" || filterYear === "all") return 0;
+    const periodStart = new Date(filterYear, filterMonth, 1);
+    let income = 0, expense = 0;
+    entries.forEach((tx) => {
+      if (tx.currency !== "USD") return;
+      if (filterUser !== "all" && tx.createdByUserId !== filterUser) return;
+      if (new Date(tx.date) >= periodStart) return;
+      if (tx.type === "income") income += Number(tx.amount);
+      else expense += Number(tx.amount);
+    });
+    const net = income - expense;
+    return net > 0 ? net : 0;
+  }, [entries, filterMonth, filterYear, filterUser]);
+
   const usdTotals = useMemo(() => {
     let income = 0, expense = 0;
     visibleEntries.forEach((tx) => {
@@ -727,8 +748,8 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
       if (tx.type === "income") income += Number(tx.amount);
       else expense += Number(tx.amount);
     });
-    return { income, expense };
-  }, [visibleEntries]);
+    return { income: income + carryIn, expense, periodIncome: income };
+  }, [visibleEntries, carryIn]);
 
   const visibleSavings = useMemo(() => {
     return (savings || []).filter((g) => {
@@ -862,7 +883,8 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <SummaryCard label={t("totalIncome")} value={fmt(usdTotals.income, "USD")} color="#3F7D5C" icon="⬆️" />
+        <SummaryCard label={t("totalIncome")} value={fmt(usdTotals.income, "USD")} color="#3F7D5C" icon="⬆️"
+          note={carryIn > 0 ? t("carryInNote") + " " + fmt(carryIn, "USD") : null} />
         <SummaryCard label={t("totalExpense")} value={fmt(usdTotals.expense, "USD")} color="#B5443C" icon="⬇️" />
         <SummaryCard label={t("netBalance")} value={fmt(usdTotals.income - usdTotals.expense, "USD")} color="#1B4B43" icon="⚖️" />
         <SummaryCard label={t("totalSavings")} value={fmt(totalSaved, "USD")} color="#C89B3C" icon="🐷" />
@@ -963,12 +985,13 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
   );
 }
 
-function SummaryCard({ label, value, color, icon }) {
+function SummaryCard({ label, value, color, icon, note }) {
   return (
     <div className="rounded-2xl p-3 md:p-4" style={{ background: "#FFFFFF", border: "1px solid #EFE9D8" }}>
       <div className="text-lg mb-1">{icon}</div>
       <div className="text-[10px] md:text-xs mb-1" style={{ color: "#9C9280" }}>{label}</div>
       <div className="text-xs md:text-sm font-bold mono truncate" style={{ color }}>{value}</div>
+      {note && <div className="text-[9px] mt-1 truncate" style={{ color: "#C89B3C" }}>{note}</div>}
     </div>
   );
 }
