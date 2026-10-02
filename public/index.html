@@ -12,8 +12,6 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf-autotable.min.js"></script>
 <style>
   * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
   body { margin: 0; font-family: 'Kantumruy Pro', 'Noto Sans Khmer', sans-serif; }
@@ -229,7 +227,6 @@ const T = {
   noChartData: { en: "Not enough data to show a chart yet", kh: "មិនទាន់មានទិន្នន័យគ្រប់គ្រាន់សម្រាប់បង្ហាញក្រាហ្វិកទេ" },
   recentEntries: { en: "Recent entries", kh: "ការកត់ត្រាថ្មី" },
   exportExcel: { en: "Excel", kh: "Excel" },
-  exportPdf: { en: "PDF", kh: "PDF" },
   exportedOn: { en: "Exported on", kh: "នាំចេញនៅថ្ងៃទី" },
   loading: { en: "Loading...", kh: "កំពុងផ្ទុក..." },
   recordedBy: { en: "Recorded by", kh: "កត់ត្រាដោយ" },
@@ -265,7 +262,7 @@ function saveLocal(key, value) {
 }
 
 /* =========================================================================
-   EXPORT: Excel (.xlsx) and PDF
+   EXPORT: Excel (.xlsx)
    ========================================================================= */
 function exportToExcel(filtered, allCategories, lang, t) {
   const rows = filtered.map((tx) => {
@@ -285,35 +282,6 @@ function exportToExcel(filtered, allCategories, lang, t) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Entries");
   XLSX.writeFile(wb, "family-ledger-" + todayISO() + ".xlsx");
-}
-
-function exportToPdf(filtered, allCategories, t) {
-  // Note: jsPDF's built-in fonts don't support Khmer glyphs, so the PDF
-  // export uses English labels/category names to avoid broken characters.
-  const doc = new jspdf.jsPDF();
-  doc.setFontSize(14);
-  doc.text("Family Ledger - Entries", 14, 15);
-  doc.setFontSize(9);
-  doc.text("Exported on " + todayISO(), 14, 21);
-  const rows = filtered.map((tx) => {
-    const cat = allCategories.find((c) => c.id === tx.category);
-    return [
-      formatDateDisplay(tx.date),
-      tx.type === "income" ? "Income" : "Expense",
-      cat ? cat.en : tx.category,
-      Number(tx.amount).toLocaleString("en-US") + " " + tx.currency,
-      tx.member || "",
-      tx.note || "",
-    ];
-  });
-  doc.autoTable({
-    startY: 26,
-    head: [["Date", "Type", "Category", "Amount", "Member", "Note"]],
-    body: rows,
-    styles: { fontSize: 8 },
-    headStyles: { fillColor: [27, 75, 67] },
-  });
-  doc.save("family-ledger-" + todayISO() + ".pdf");
 }
 
 /* =========================================================================
@@ -857,10 +825,6 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
         <button onClick={() => exportToExcel(visibleEntries, allCategories, lang, t)}
           className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#217346" }}>
           📊 {t("exportExcel")}
-        </button>
-        <button onClick={() => exportToPdf(visibleEntries, allCategories, t)}
-          className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5" style={{ background: "#FFFFFF", border: "1px solid #E8E0CE", color: "#B5443C" }}>
-          📄 {t("exportPdf")}
         </button>
       </div>
 
