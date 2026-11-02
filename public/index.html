@@ -219,7 +219,7 @@ const T = {
   totalIncome: { en: "Total income", kh: "ចំណូលសរុប" },
   totalExpense: { en: "Total expense", kh: "ចំណាយសរុប" },
   netBalance: { en: "Net balance", kh: "សមតុល្យសុទ្ធ" },
-  carryInNote: { en: "incl. carried over from before:", kh: "រួមទាំងសល់ពីមុន:" },
+  carryInNote: { en: "incl. balance carried over:", kh: "រួមទាំងសមតុល្យពីខែមុន:" },
   totalSavings: { en: "Total savings", kh: "សរុបការសន្សំ" },
   viewAll: { en: "View all", kh: "មើលទាំងអស់" },
   trendChart: { en: "Income vs Expense by month", kh: "និន្នាការចំណូល-ចំណាយតាមខែ" },
@@ -689,11 +689,13 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
     return filterUser === "all" ? filtered : filtered.filter((tx) => tx.createdByUserId === filterUser);
   }, [filtered, filterUser]);
 
-  // Balance carried forward: when a specific month+year is selected, any
-  // leftover positive balance (income - expense) from everything *before*
-  // that month rolls forward and counts as income for the selected period —
-  // per member when a member filter is active, or for the whole family
-  // when "all" is selected.
+  // Balance carried forward: when a specific month+year is selected, the
+  // leftover balance (income - expense) from everything *before* that month
+  // rolls forward into the selected period — whether it is positive (money
+  // left over) or negative (overspent). It is added to the period's income
+  // figure, so a negative carry-over reduces it. This is calculated per
+  // member when a member filter is active; with "all" selected it is the sum
+  // of every member's balance (= the whole family's balance).
   const carryIn = useMemo(() => {
     if (filterMonth === "all" || filterYear === "all") return 0;
     const periodStart = new Date(filterYear, filterMonth, 1);
@@ -705,8 +707,8 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
       if (tx.type === "income") income += Number(tx.amount);
       else expense += Number(tx.amount);
     });
-    const net = income - expense;
-    return net > 0 ? net : 0;
+    const net = Math.round((income - expense) * 100) / 100;
+    return Math.abs(net) < 0.005 ? 0 : net;
   }, [entries, filterMonth, filterYear, filterUser]);
 
   const usdTotals = useMemo(() => {
@@ -848,7 +850,7 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <SummaryCard label={t("totalIncome")} value={fmt(usdTotals.income, "USD")} color="#3F7D5C" icon="⬆️"
-          note={carryIn > 0 ? t("carryInNote") + " " + fmt(carryIn, "USD") : null} />
+          note={carryIn !== 0 ? t("carryInNote") + " " + fmt(carryIn, "USD") : null} />
         <SummaryCard label={t("totalExpense")} value={fmt(usdTotals.expense, "USD")} color="#B5443C" icon="⬇️" />
         <SummaryCard label={t("netBalance")} value={fmt(usdTotals.income - usdTotals.expense, "USD")} color="#1B4B43" icon="⚖️" />
         <SummaryCard label={t("totalSavings")} value={fmt(totalSaved, "USD")} color="#C89B3C" icon="🐷" />
