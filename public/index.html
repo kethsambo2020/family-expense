@@ -220,6 +220,9 @@ const T = {
   totalExpense: { en: "Total expense", kh: "ចំណាយសរុប" },
   netBalance: { en: "Net balance", kh: "សមតុល្យសុទ្ធ" },
   carryInNote: { en: "incl. balance carried over:", kh: "រួមទាំងសមតុល្យពីខែមុន:" },
+  carryFromLabel: { en: "From", kh: "មកពី" },
+  carryPrior: { en: "prior balance", kh: "សមតុល្យមុននោះ" },
+  carriedOutNote: { en: "Remaining balance moved to next month:", kh: "សមតុល្យដែលនៅសល់ បញ្ចូលក្នុងខែបន្ទាប់:" },
   totalSavings: { en: "Total savings", kh: "សរុបការសន្សំ" },
   viewAll: { en: "View all", kh: "មើលទាំងអស់" },
   trendChart: { en: "Income vs Expense by month", kh: "និន្នាការចំណូល-ចំណាយតាមខែ" },
@@ -695,21 +698,43 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
   // left over) or negative (overspent). It is added to the period's income
   // figure, so a negative carry-over reduces it. This is calculated per
   // member when a member filter is active; with "all" selected it is the sum
-  // of every member's balance (= the whole family's balance).
-  const carryIn = useMemo(() => {
-    if (filterMonth === "all" || filterYear === "all") return 0;
+  // of every member's balance (= the whole family's balance). The previous
+  // month's income/expense are also returned so the card can explain the
+  // carried-over amount.
+  const carryInfo = useMemo(() => {
+    const none = { carryIn: 0, prev: null };
+    if (filterMonth === "all" || filterYear === "all") return none;
+    const r2 = (n) => { const v = Math.round(n * 100) / 100; return Math.abs(v) < 0.005 ? 0 : v; };
     const periodStart = new Date(filterYear, filterMonth, 1);
-    let income = 0, expense = 0;
+    const prevStart = new Date(filterYear, filterMonth - 1, 1); // wraps Jan -> previous Dec
+    let before = 0, prevIncome = 0, prevExpense = 0;
     entries.forEach((tx) => {
       if (tx.currency !== "USD") return;
       if (filterUser !== "all" && tx.createdByUserId !== filterUser) return;
-      if (new Date(tx.date) >= periodStart) return;
-      if (tx.type === "income") income += Number(tx.amount);
-      else expense += Number(tx.amount);
+      const d = new Date(tx.date);
+      if (d >= periodStart) return;
+      const amt = Number(tx.amount);
+      if (d >= prevStart) {
+        // belongs to the month right before the selected one
+        if (tx.type === "income") prevIncome += amt; else prevExpense += amt;
+      } else {
+        // everything older than that (already rolled forward into it)
+        before += tx.type === "income" ? amt : -amt;
+      }
     });
-    const net = Math.round((income - expense) * 100) / 100;
-    return Math.abs(net) < 0.005 ? 0 : net;
+    const carryIn = r2(before + prevIncome - prevExpense);
+    return {
+      carryIn,
+      prev: {
+        monthIndex: prevStart.getMonth(),
+        year: prevStart.getFullYear(),
+        income: r2(prevIncome),
+        expense: r2(prevExpense),
+        priorBalance: r2(before),
+      },
+    };
   }, [entries, filterMonth, filterYear, filterUser]);
+  const carryIn = carryInfo.carryIn;
 
   const usdTotals = useMemo(() => {
     let income = 0, expense = 0;
@@ -720,6 +745,28 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
     });
     return { income: income + carryIn, expense, periodIncome: income };
   }, [visibleEntries, carryIn]);
+
+  // A month that is already in the past is "closed": whatever balance is left
+  // in it (positive or negative) has been moved into the following month, so
+  // this month's own balance is shown as 0 with a note saying where it went.
+  const now = new Date();
+  const isClosedMonth = filterMonth !== "all" && filterYear !== "all" &&
+    (filterYear < now.getFullYear() || (filterYear === now.getFullYear() && filterMonth < now.getMonth()));
+  const rawNet = Math.round((usdTotals.income - usdTotals.expense) * 100) / 100;
+  const movedOnAmount = isClosedMonth && Math.abs(rawNet) >= 0.005 ? rawNet : 0;
+  const displayNet = isClosedMonth ? 0 : rawNet;
+
+  // Notes shown under the income card of the NEW month: how much came in
+  // from the previous month and why (previous month's income minus expense).
+  const carryNotes = useMemo(() => {
+    if (carryIn === 0 || !carryInfo.prev) return null;
+    const pv = carryInfo.prev;
+    const monthLabel = (lang === "kh" ? "ខែ" + MONTHS[pv.monthIndex].kh : MONTHS[pv.monthIndex].en) + " " + pv.year;
+    let reason = t("carryFromLabel") + " " + monthLabel + ": " + t("income") + " " + fmt(pv.income, "USD") +
+      " − " + t("expense") + " " + fmt(pv.expense, "USD");
+    if (pv.priorBalance !== 0) reason += " + " + t("carryPrior") + " " + fmt(pv.priorBalance, "USD");
+    return [t("carryInNote") + " " + fmt(carryIn, "USD"), reason];
+  }, [carryIn, carryInfo, lang]);
 
   const visibleSavings = useMemo(() => {
     return (savings || []).filter((g) => {
@@ -850,9 +897,10 @@ function HomePage({ t, lang, entries, filtered, totals, filterMonth, setFilterMo
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <SummaryCard label={t("totalIncome")} value={fmt(usdTotals.income, "USD")} color="#3F7D5C" icon="⬆️"
-          note={carryIn !== 0 ? t("carryInNote") + " " + fmt(carryIn, "USD") : null} />
+          note={carryNotes} />
         <SummaryCard label={t("totalExpense")} value={fmt(usdTotals.expense, "USD")} color="#B5443C" icon="⬇️" />
-        <SummaryCard label={t("netBalance")} value={fmt(usdTotals.income - usdTotals.expense, "USD")} color="#1B4B43" icon="⚖️" />
+        <SummaryCard label={t("netBalance")} value={fmt(displayNet, "USD")} color="#1B4B43" icon="⚖️"
+          note={movedOnAmount !== 0 ? t("carriedOutNote") + " " + fmt(movedOnAmount, "USD") : null} />
         <SummaryCard label={t("totalSavings")} value={fmt(totalSaved, "USD")} color="#C89B3C" icon="🐷" />
       </div>
 
@@ -957,7 +1005,9 @@ function SummaryCard({ label, value, color, icon, note }) {
       <div className="text-lg mb-1">{icon}</div>
       <div className="text-[10px] md:text-xs mb-1" style={{ color: "#9C9280" }}>{label}</div>
       <div className="text-xs md:text-sm font-bold mono truncate" style={{ color }}>{value}</div>
-      {note && <div className="text-[9px] mt-1 truncate" style={{ color: "#C89B3C" }}>{note}</div>}
+      {note && (Array.isArray(note) ? note : [note]).map((line, i) => (
+        <div key={i} className="text-[9px] mt-1 leading-snug" style={{ color: "#C89B3C" }}>{line}</div>
+      ))}
     </div>
   );
 }
